@@ -34,8 +34,9 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
   their binary32 representation directly. Other steps and fractional or
   out-of-range values use the full floating-point operations.
 - The CPU6 assembly dispatch loop keeps the instruction and value-stack
-  pointers in registers. It combines common indexed operations and handles
-  the arithmetic hot path before falling back to C for float32 and I/O.
+  pointers in registers. It copies real literals and scalars directly and
+  handles common indexed operations and integer arithmetic. Real-to-integer
+  conversion uses the encoded exponent and fraction with signed bounds.
 - The native dispatcher appends a single literal character in place when
   a nonempty string ends at the heap tail. The C string runtime handles
   compaction, longer literals and the existing length and capacity errors.

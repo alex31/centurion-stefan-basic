@@ -107,6 +107,15 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    output=await command(loop);assert.match(output,/out of range/,output);
   }
   checks.push('real FOR preserves exponent transitions, fractional and negative steps and range errors');
+  for(const [value,converted] of [['-0.75',0],['127.75',127],['128.75',128],
+                                ['32767.75',32767],['-32768.75',-32768]]) {
+   output=await command('I='+value+':PRINT "CONVERT ";I');
+   assert.match(output,new RegExp('\\nCONVERT '+converted+' *\\r?\\n'),output);
+  }
+  for(const value of ['32768','-32769']){
+   output=await command('I='+value);assert.match(output,/out of range/,output);
+  }
+  checks.push('real to integer conversion truncates toward zero with signed 16-bit bounds');
   await command('RESTORE 2');
   output=await command('READ I');assert.match(output,/Invalid type/,output);
   await command('READ A$');

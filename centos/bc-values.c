@@ -13,9 +13,30 @@ int ib_float(unsigned op, ib_value *a, ib_value *b)
         return IB_OK;
     }
     if (op == IB_ITOP || op == IB_ILEFT) {
+#ifdef __CPU6_OS6__
+        unsigned high = a->words[0], low = a->words[1];
+        unsigned magnitude = high & 0x7fffu;
+        unsigned negative = high & 0x8000u;
+        unsigned truncated = 0;
+        if (magnitude >= 0x4700u) {
+            /* A negative fraction below 32769 still truncates to -32768. */
+            if (!negative || magnitude != 0x4700u || low >= 0x100u)
+                return IB_RANGE;
+            truncated = 0x8000u;
+        } else if (magnitude >= 0x3f80u) {
+            unsigned exponent = (magnitude >> 7) - 127u;
+            unsigned significand = (magnitude & 127u) | 128u;
+            if (exponent <= 7)
+                truncated = significand >> (7 - exponent);
+            else
+                truncated = (significand << (exponent - 7)) | (low >> (23 - exponent));
+        }
+        a->integer = (int16_t)(negative ? 0u - truncated : truncated);
+#else
         if (!(a->real > -32769.0f && a->real < 32768.0f))
             return IB_RANGE;
         a->integer = (int16_t)a->real;
+#endif
         return IB_OK;
     }
     left = a->real;

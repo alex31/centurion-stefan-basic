@@ -200,7 +200,6 @@ int ib_execute(struct ib_program *program)
             continue;
 #ifndef STBASIC_VM_ASM
         case IB_CONST: case IB_ILOAD:
-#endif
         case IB_LITERAL: case IB_LOAD:
             if (sp == ib_state.stack + STACKSIZE) {
                 status = IB_STACK;
@@ -223,10 +222,7 @@ int ib_execute(struct ib_program *program)
             }
             ++sp;
             continue;
-#ifndef STBASIC_VM_ASM
-        case IB_ISTORE:
-#endif
-        case IB_STORE:
+        case IB_ISTORE: case IB_STORE:
             var = scalar_at(ip[1]);
             --sp;
             if (op == IB_ISTORE)
@@ -235,6 +231,7 @@ int ib_execute(struct ib_program *program)
                 var->real = sp->real;
             ip += 2;
             continue;
+#endif
         case IB_INDEX: case IB_PUT: {
             unsigned v = ip[1] & 127;
             unsigned index;
@@ -246,11 +243,22 @@ int ib_execute(struct ib_program *program)
                 goto range;
             array = ib_array_data(ib_state.array[v].data);
             if (ip[1] & 128) {
+#ifdef STBASIC_VM_ASM
+                uint8_t *element = array + 4u * index;
+                if (op == IB_INDEX) {
+                    sp[-1].words[0] = vm_word(element);
+                    sp[-1].words[1] = vm_word(element + 2);
+                } else {
+                    vm_write_word(element, sp->words[0]);
+                    vm_write_word(element + 2, sp->words[1]);
+                }
+#else
                 p = (unsigned)(array - base) + 4 * index;
                 if (op == IB_INDEX)
                     sp[-1].real = getnumber(p, memread2);
                 else
                     setnumber(p, memwrite2, sp->real);
+#endif
             } else {
                 uint8_t *element = array + 2 * index;
                 if (op == IB_INDEX)

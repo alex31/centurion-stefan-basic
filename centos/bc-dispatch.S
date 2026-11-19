@@ -86,6 +86,48 @@ storevar:
     inr x,2
     jmp poll
 
+/* Real tokens, scalar slots and stack entries use the same four bytes. */
+literalreal:
+    xfr y,a
+    ldb (_ib_stack_end)
+    sab
+    jz stackerr
+    lda _mem
+    ldb 1(x)
+    aab
+    inr x,3
+    bra push_real
+loadreal:
+    xfr y,a
+    ldb (_ib_stack_end)
+    sab
+    jz stackerr
+    cla
+    ldab 1(x)
+    ldb _ib_state
+    aab
+    inr x,2
+push_real:
+    lda (b)
+    sta (y)
+    lda 2(b)
+    sta 2(y)
+    inr y,4
+    jmp poll
+
+storereal:
+    cla
+    ldab 1(x)
+    ldb _ib_state
+    aab
+    dcr y,4
+    lda (y)
+    sta (b)
+    lda 2(y)
+    sta 2(b)
+    inr x,2
+    jmp poll
+
 iadd:
     lda -8(y)
     ldb -4(y)
