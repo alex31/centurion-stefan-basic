@@ -18,6 +18,11 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
   `ASC`, `CHR$`, `LEFT$`, `RIGHT$`, `MID$`, `STR$` and `VAL`. Each string
   can contain up to 255 characters. The variables share 4 KiB of string
   storage. The VM uses an additional bounded buffer for temporary results.
+- `DATA` defines signed numeric literals and quoted strings in stored
+  programs. `READ` assigns them in source order to numeric scalars and
+  arrays, or to string variables. `RESTORE` rewinds to the beginning.
+  `RESTORE n` selects the n-th value, starting at 1. The data cursor reads
+  the stored tokens directly and reports type errors and end of data.
 - The REPL and line editor share a code overlay. The compiler and VM run
   from their own overlays while variables live in permanent RAM.
 - The CPU6 assembly dispatch loop keeps the instruction and value-stack

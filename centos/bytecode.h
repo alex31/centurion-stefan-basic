@@ -5,7 +5,7 @@
 
 enum ib_type { IB_BAD, IB_INT, IB_REAL, IB_STRING };
 enum ib_status { IB_OK, IB_SYNTAX, IB_MEMORY, IB_TYPE, IB_RANGE, IB_BRANCH,
-                 IB_LOOP, IB_STACK, IB_DIVZERO };
+                 IB_LOOP, IB_STACK, IB_DIVZERO, IB_OUT_OF_DATA };
 enum ib_op {
 #define IB_OP(name, handler) IB_##name,
 #include "bc-ops.def"
@@ -67,6 +67,9 @@ void bas_run_program(unsigned);
 void bas_run_immediate(char *);
 void ib_reset(void);
 void ib_clear_arrays(void);
+void ib_reset_data(void);
+int ib_restore_data(unsigned);
+int ib_read_data(unsigned, ib_value *);
 int ib_compile_immediate(struct ib_program *, unsigned, unsigned);
 int ib_compile(struct ib_program *, unsigned);
 int ib_execute(struct ib_program *);

@@ -82,7 +82,7 @@ def main():
  output.parent.mkdir(parents=True,exist_ok=True)
  sources=[ROOT/'swext/stefan-basic/src/basic.c',HERE/'runtime.c',HERE/'main.c',HERE/'power.c',HERE/'decimal.c']
  if args.commands:
-  sources += [HERE/n for n in ['commands.c','program.c','editor.c','fileio.c','text.c','bytecode.c','bc-compile.c','bc-expr.c','bc-run.c','bc-values.c','bc-strings.c']]+[args.file_service.resolve()]
+  sources += [HERE/n for n in ['commands.c','program.c','editor.c','fileio.c','text.c','bytecode.c','bc-compile.c','bc-expr.c','bc-run.c','bc-values.c','bc-strings.c','bc-data.c']]+[args.file_service.resolve()]
   # Read and tokenize every text record in the same slot, including the
   # exact numeric parser, from the first open to the second close.
   GROUPS[0][1].update({'bas_stage':('int',['char *']),'bas_copy':('void',['unsigned','unsigned']),
@@ -112,6 +112,9 @@ def main():
   # Place the expression parser with the statements that call it.
   GROUPS.append(('bytecode-compile',{'ib_compile':('int',['void *','unsigned']),
    'ib_declare_int':('void',['void *']),
+   # READ/RESTORE statement compilation is infrequent. Keep their bodies in
+   # the small compiler overlay; DATA validation stays with the source walk.
+   'ib_read_stmt':('void',['void *']), 'ib_restore_stmt':('void',['void *']),
    'ib_compile_immediate':('int',['void *','unsigned','unsigned'])}))
   GROUPS.append(('bytecode-stmt',{n:('void',['void *']) for n in
    ('ib_lines','ib_stmt','ib_assign','ib_for_stmt','ib_next_stmt','ib_print_stmt','ib_dimension')}))
@@ -179,9 +182,14 @@ def main():
   # Run the same inter-file optimizer as the ordinary C driver before assigning
   # bodies to MMU/overlay groups. Whole-program reachability is still applied.
   assemblies=[]
-  # Share multiprecision and statement parser helpers. Their overlays compete
-  # for the same slot, whose capacity is set by the largest body of code.
-  unit_options={HERE/name:['--cpu6-no-auto-inline'] for name in ('decimal.c','bc-compile.c')} if args.commands and not args.no_auto_inline else {}
+  # The statement compiler is cold during program execution and occupies
+  # the largest overlay. Keep it compact and share its parser helpers.
+  unit_options={}
+  if args.commands:
+   unit_options[HERE/'bc-compile.c']=['--opt-code-size']
+   if not args.no_auto_inline:
+    unit_options[HERE/'bc-compile.c'].append('--cpu6-no-auto-inline')
+    unit_options[HERE/'decimal.c']=['--cpu6-no-auto-inline']
   for i,source in enumerate(sources):
    asm=work/('user%d.compiler.s'%i)
    run([tools/'sdcc-cpu6/bin/sdcc',*flags,*unit_options.get(source,()),'-I'+str(source.parent),'-o',asm,source],'user%d-compile.log'%i)

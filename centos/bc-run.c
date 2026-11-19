@@ -177,6 +177,27 @@ int ib_execute(struct ib_program *program)
         switch (op) {
         case IB_END:
             return IB_OK;
+        case IB_READ:
+            if (sp == ib_state.stack + STACKSIZE) {
+                status = IB_STACK;
+                goto done;
+            }
+            status = ib_read_data(ip[1], sp);
+            if (status || er || stb_done) goto done;
+            ++sp;
+            ip += 2;
+            continue;
+        case IB_RESTORE:
+            if (ip[1]) {
+                result = (--sp)->integer;
+                if (result < 1) goto range;
+                status = ib_restore_data((unsigned)result);
+                if (status || er || stb_done) goto done;
+            } else {
+                ib_reset_data();
+            }
+            ip += 2;
+            continue;
 #ifndef STBASIC_VM_ASM
         case IB_CONST: case IB_ILOAD:
 #endif

@@ -4,7 +4,7 @@ static const char *const ib_errors[] = {
     "", "Unsupported statement or syntax", "BASIC memory exhausted",
     "Invalid type or undeclared array", "Number, array index or string length out of range",
     "Unknown branch line", "Unmatched FOR/NEXT or RETURN", "Bytecode stack limit",
-    "Division by zero"
+    "Division by zero", "Out of DATA"
 };
 
 struct ib_state ib_state;
@@ -17,6 +17,7 @@ void ib_clear_arrays(void)
         ib_state.array[i].count = 0;
     }
     himem = MEMSIZE;
+    ib_reset_data();
 }
 
 void ib_reset(void)

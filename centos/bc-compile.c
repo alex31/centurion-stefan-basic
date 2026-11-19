@@ -130,6 +130,13 @@ void ib_dimension(struct ib_compile *c)
     } while (!c->error);
 }
 
+static void emit_store(struct ib_compile *c, unsigned array, unsigned variable, unsigned type)
+{
+    ib_emit(c, array ? IB_PUT : type == IB_STRING ? IB_SSTORE : type == IB_INT ? IB_ISTORE : IB_STORE);
+    ib_emit(c, array ? variable | (type == IB_REAL ? 128 : 0) :
+               type == IB_STRING ? variable : IB_SCALAR_OFFSET(variable));
+}
+
 void ib_assign(struct ib_compile *c)
 {
     unsigned array = c->token == ARRAYVAR, string = c->token == STRINGVAR;
@@ -183,8 +190,7 @@ void ib_assign(struct ib_compile *c)
         ib_emit(c, IB_ARRAY_OFFSET(v));
         return;
     }
-    ib_emit(c, array ? IB_PUT : string ? IB_SSTORE : t == IB_INT ? IB_ISTORE : IB_STORE);
-    ib_emit(c, array ? v | (t == IB_REAL ? 128 : 0) : string ? v : IB_SCALAR_OFFSET(v));
+    emit_store(c, array, v, t);
 }
 
 void ib_print_stmt(struct ib_compile *c)
@@ -273,6 +279,60 @@ void ib_next_stmt(struct ib_compile *c)
         IB_SET(c->exit_patch[depth], c->out);
 }
 
+static void data_stmt(struct ib_compile *c)
+{
+    if (!c->program.lines) {
+        c->error = IB_SYNTAX;
+        return;
+    }
+    while (!c->error) {
+        if (c->token == '+' || c->token == '-') {
+            ib_take(c);
+            if (!eat(c, NUMBER)) return;
+        } else if (c->token == NUMBER || c->token == STRING) {
+            ib_take(c);
+        } else {
+            c->error = IB_SYNTAX;
+            return;
+        }
+        if (c->token != ',') return;
+        ib_take(c);
+    }
+}
+
+void ib_read_stmt(struct ib_compile *c)
+{
+    while (!c->error) {
+        unsigned array = c->token == ARRAYVAR, string = c->token == STRINGVAR;
+        unsigned v = ib_variable(c);
+        unsigned type = string ? IB_STRING : ib_state.type[v];
+        ib_take(c);
+        if (array) {
+            if (!ib_state.array[v].data) {
+                c->error = IB_TYPE;
+                return;
+            }
+            if (!eat(c, '(')) return;
+            ib_coerce(c, ib_expr(c), IB_INT);
+            if (!eat(c, ')')) return;
+        }
+        if (c->error) return;
+        ib_emit(c, IB_READ);
+        ib_emit(c, type);
+        emit_store(c, array, v, type);
+        if (c->token != ',') return;
+        ib_take(c);
+    }
+}
+
+void ib_restore_stmt(struct ib_compile *c)
+{
+    unsigned ordinal = !end_statement(c);
+    if (ordinal) ib_coerce(c, ib_expr(c), IB_INT);
+    ib_emit(c, IB_RESTORE);
+    ib_emit(c, ordinal);
+}
+
 void ib_stmt(struct ib_compile *c)
 {
     unsigned start, patch, type, v, line;
@@ -288,6 +348,9 @@ void ib_stmt(struct ib_compile *c)
         ib_assign(c);
         break;
     case TPRINT: ib_print_stmt(c); break;
+    case TDATA: data_stmt(c); break;
+    case TREAD: ib_read_stmt(c); break;
+    case TRESTORE: ib_restore_stmt(c); break;
     case TINPUT: {
         if (c->token != VARIABLE && c->token != STRINGVAR) {
             c->error = IB_TYPE;

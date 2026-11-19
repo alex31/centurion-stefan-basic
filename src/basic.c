@@ -188,10 +188,12 @@ const char sfcircle[]   PROGMEM  = "FCIRCLE";
 const char sfrect[]     PROGMEM  = "FRECT";
 #endif
 /* Dartmouth BASIC extensions */
-#ifdef HASDARTMOUTH
+#if defined(HASDARTMOUTH) || defined(STBASIC_COMMANDS)
 const char sdata[]      PROGMEM  = "DATA";
 const char sread[]      PROGMEM  = "READ";
 const char srestore[]   PROGMEM  = "RESTORE";
+#endif
+#ifdef HASDARTMOUTH
 const char sdef[]       PROGMEM  = "DEF";
 const char sfn[]        PROGMEM  = "FN";
 const char son[]        PROGMEM  = "ON";
@@ -329,8 +331,11 @@ const char* const keyword[] PROGMEM = {
   scolor, splot, sline, scircle, srect,
   sfcircle, sfrect,
 #endif
+#if defined(HASDARTMOUTH) || defined(STBASIC_COMMANDS)
+  sdata, sread, srestore,
+#endif
 #ifdef HASDARTMOUTH
-  sdata, sread, srestore, sdef, sfn, son,
+  sdef, sfn, son,
 #endif
 #ifdef HASDARKARTS
   smalloc, sfind, seval,
@@ -429,8 +434,11 @@ const token_t tokens[] PROGMEM = {
   TCOLOR, TPLOT, TLINE, TCIRCLE, TRECT,
   TFCIRCLE, TFRECT,
 #endif
+#if defined(HASDARTMOUTH) || defined(STBASIC_COMMANDS)
+  TDATA, TREAD, TRESTORE,
+#endif
 #ifdef HASDARTMOUTH
-  TDATA, TREAD, TRESTORE, TDEF, TFN, TON,
+  TDEF, TFN, TON,
 #endif
 #ifdef HASDARKARTS
   TMALLOC, TFIND, TEVAL,
