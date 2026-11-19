@@ -23,6 +23,9 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
 - The CPU6 assembly dispatch loop keeps the instruction and value-stack
   pointers in registers. It combines common indexed operations and handles
   the arithmetic hot path before falling back to C for float32 and I/O.
+- The native dispatcher appends a single literal character in place when
+  a nonempty string ends at the heap tail. The C string runtime handles
+  compaction, longer literals and the existing length and capacity errors.
 - The CENTOS console batches up to 80 characters in one write. Bytecode
   `PRINT` passes strings to the terminal buffer by length. The terminal
   tests check spaces across a full buffer and newlines inside a string.

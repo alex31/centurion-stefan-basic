@@ -1,6 +1,8 @@
 /* The CPU6 keeps the bytecode address in X, the next free value in Y and
    the remaining checkpoint budget in Z. Return at the first C opcode, with
    that opcode still under X. Branch operands are big-endian arena offsets. */
+#include "bc-string-layout.h"
+
     .setcpu 6
     .code
     .export _ib_dispatch
@@ -401,4 +403,61 @@ finish:
     xay
     ldx (s+)
     rsr
+
+/* A one-character append to the last nonempty string only grows its
+   descriptor and the heap tail. Let C handle all other cases, including
+   compaction and error reporting, with X still on the same opcode. */
+sappend:
+    lda _mem
+    ldb 2(x)
+    aab
+    ldab (b)
+    dcrb al
+    jnz slow
+    stb (s)
+    xfr y,a
+    sta (-s)
+    clrb bh
+    ldbb 1(x)
+    slr b
+    slr b
+    lda _ib_string_vars
+    aab
+    xfr b,y
+    ldb 2(y)
+    ori b,b
+    jz sappend_slow
+    lda IB_STRING_LIMIT
+    sab
+    jz sappend_slow
+    lda (y)
+    ldb 2(y)
+    aab
+    lda IB_STRING_HEAP_REF
+    sub b,a             /* tagged end - heap reference tag */
+    ldb (_ib_string_used)
+    sub b,a
+    jnz sappend_slow
+    lda IB_STRING_HEAP_SIZE
+    sub b,a
+    jz sappend_slow
+    inr b
+    stb (_ib_string_used)
+    dcr b
+    lda _ib_string_heap
+    aab
+    lda 2(s)
+    ldab 1(a)
+    stab (b)
+    ldb 2(y)
+    inr b
+    stb 2(y)
+    lda (s+)
+    xay
+    inr x,4
+    jmp poll
+sappend_slow:
+    lda (s+)
+    xay
+    jmp slow
 ; CPU6 function _ib_dispatch end

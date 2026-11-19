@@ -1,24 +1,31 @@
 #include "bytecode.h"
+#include "bc-string-layout.h"
 
-#define STRING_LIMIT 255
-#define STRING_HEAP 4096
 #define STRING_TEMP 1024
-#define OFFSET_MASK 0x3fffU
-#define HEAP_REF 0x4000U
+#define OFFSET_MASK (IB_STRING_HEAP_REF - 1)
 #define TEMP_REF 0x8000U
 
 /* Program literals, permanent strings and expression temporaries are distinct.
    Only assignment compacts the permanent heap. A value never survives that
    operation on the expression stack. */
-static struct ib_string variables[IB_STRING_VARIABLES];
-static char heap[STRING_HEAP], temporary[STRING_TEMP], scratch[STRING_LIMIT + 1];
-static uint16_t heap_end, temp_end;
+struct ib_string ib_string_vars[IB_STRING_VARIABLES];
+char ib_string_heap[IB_STRING_HEAP_SIZE];
+uint16_t ib_string_used;
+static char temporary[STRING_TEMP], scratch[IB_STRING_LIMIT + 1];
+static uint16_t temp_end;
+
+#ifdef STBASIC_VM_ASM
+typedef char ib_string_dispatch_layout[
+    sizeof(struct ib_string) == 4 &&
+    __builtin_offsetof(struct ib_string, location) == 0 &&
+    __builtin_offsetof(struct ib_string, length) == 2 ? 1 : -1];
+#endif
 
 static const char *bytes(const struct ib_string *value)
 {
     unsigned offset = value->location & OFFSET_MASK;
     if (value->location & TEMP_REF) return temporary + offset;
-    if (value->location & HEAP_REF) return heap + offset;
+    if (value->location & IB_STRING_HEAP_REF) return ib_string_heap + offset;
     return (const char *)mem + offset;
 }
 
@@ -46,38 +53,38 @@ static int result_string(struct ib_string *value, unsigned length)
 
 static int replace(unsigned slot, unsigned length)
 {
-    struct ib_string *target = &variables[slot];
+    struct ib_string *target = &ib_string_vars[slot];
     unsigned old = target->length, start = target->location & OFFSET_MASK;
-    if (length > STRING_HEAP - (heap_end - old)) return IB_MEMORY;
-    if (old && start + old != heap_end) {
+    if (length > IB_STRING_HEAP_SIZE - (ib_string_used - old)) return IB_MEMORY;
+    if (old && start + old != ib_string_used) {
         unsigned end = start + old;
         unsigned i;
         /* The destination is below the source, so the forward copy is safe. */
-        copy(heap + start, heap + end, heap_end - end);
+        copy(ib_string_heap + start, ib_string_heap + end, ib_string_used - end);
         for (i = 0; i < IB_STRING_VARIABLES; ++i)
-            if (variables[i].length && (variables[i].location & OFFSET_MASK) >= end)
-                variables[i].location -= old;
+            if (ib_string_vars[i].length && (ib_string_vars[i].location & OFFSET_MASK) >= end)
+                ib_string_vars[i].location -= old;
     }
-    heap_end -= old;
-    target->location = HEAP_REF | heap_end;
+    ib_string_used -= old;
+    target->location = IB_STRING_HEAP_REF | ib_string_used;
     target->length = length;
-    copy(heap + heap_end, scratch, length);
-    heap_end += length;
+    copy(ib_string_heap + ib_string_used, scratch, length);
+    ib_string_used += length;
     return IB_OK;
 }
 
 void ib_strings_reset(void)
 {
     unsigned i;
-    for (i = 0; i < IB_STRING_VARIABLES; ++i) variables[i].length = 0;
-    heap_end = temp_end = 0;
+    for (i = 0; i < IB_STRING_VARIABLES; ++i) ib_string_vars[i].length = 0;
+    ib_string_used = temp_end = 0;
 }
 
 void ib_strings_begin(void) { temp_end = 0; }
 
 void ib_string_load(unsigned slot, struct ib_string *value)
 {
-    *value = variables[slot];
+    *value = ib_string_vars[slot];
 }
 
 int ib_string_store(unsigned slot, const struct ib_string *value)
@@ -90,18 +97,18 @@ int ib_string_store(unsigned slot, const struct ib_string *value)
 
 static int append(unsigned slot, const char *source, unsigned length)
 {
-    struct ib_string *target = &variables[slot];
+    struct ib_string *target = &ib_string_vars[slot];
     unsigned old = target->length, start = target->location & OFFSET_MASK;
-    if (old + length > STRING_LIMIT) return IB_RANGE;
-    if (length > STRING_HEAP - heap_end) return IB_MEMORY;
-    if (!old || start + old == heap_end) {
-        if (!old) target->location = HEAP_REF | heap_end;
-        copy(heap + heap_end, source, length);
-        heap_end += length;
+    if (old + length > IB_STRING_LIMIT) return IB_RANGE;
+    if (length > IB_STRING_HEAP_SIZE - ib_string_used) return IB_MEMORY;
+    if (!old || start + old == ib_string_used) {
+        if (!old) target->location = IB_STRING_HEAP_REF | ib_string_used;
+        copy(ib_string_heap + ib_string_used, source, length);
+        ib_string_used += length;
         target->length += length;
         return IB_OK;
     }
-    copy(scratch, heap + start, old);
+    copy(scratch, ib_string_heap + start, old);
     copy(scratch + old, source, length);
     return replace(slot, old + length);
 }
@@ -114,9 +121,9 @@ int ib_string_append_literal(unsigned slot, unsigned literal)
 int ib_string_join(struct ib_string *left, const struct ib_string *right, unsigned slot)
 {
     unsigned length = left->length + right->length;
-    if (length > STRING_LIMIT) return IB_RANGE;
+    if (length > IB_STRING_LIMIT) return IB_RANGE;
     if (slot < IB_STRING_VARIABLES) {
-        struct ib_string *target = &variables[slot];
+        struct ib_string *target = &ib_string_vars[slot];
         if (left->length == target->length &&
             (!target->length || left->location == target->location)) {
             int status = append(slot, bytes(right), right->length);
