@@ -62,6 +62,7 @@ def main():
  parser=argparse.ArgumentParser(description=__doc__)
  parser.add_argument('-o',required=True,type=Path)
  parser.add_argument('--commands',action='store_true',help='build the CENTOS REPL and bytecode VM with float32 and strings')
+ parser.add_argument('--vm-math',action='store_true',help='keep common mathematical functions available to the running VM')
  parser.add_argument('--file-service',type=Path,default=HERE/'files.c')
  parser.add_argument('--script',action='store_true',help='build the deterministic core qualification input')
  parser.add_argument('--stack-size',type=int,default=3072)
@@ -74,6 +75,7 @@ def main():
  parser.add_argument('--vm-c',action='store_true',help='use portable C bytecode word accesses and integer arithmetic')
  parser.add_argument('--lib-root',type=Path,default=ROOT/'build/out/toolchain/lib')
  args=parser.parse_args()
+ if args.vm_math and not args.commands:parser.error('--vm-math requires --commands')
  if args.profile=='auto':
   runpy.run_path(str(HERE/'select-profile.py'))['build'](sys.argv[1:],args);return
  if not 256<=args.stack_size<=8192 or not 4096<=args.memory<=16384:parser.error('invalid stack or program reservation')
@@ -129,6 +131,18 @@ def main():
   if not args.vm_c:
    vm_functions.update({n:('int',['void *','int']) for n in ('ib_add16','ib_mul16')})
    vm_functions['ib_dispatch']=('int',['void *'])
+  if args.vm_math:
+   # Number input shares its parser with the lexer. Keep the range reducer
+   # and logarithm in mapped code so the trigonometric functions and LOG
+   # can execute without replacing the VM.
+   vm_functions.pop('ib_input')
+   GROUPS[0][1]['ib_input']=('int',['unsigned','void *'])
+   GROUPS[:]=[entry for entry in GROUPS if entry[0] not in ('circular','powers')]
+   vm_functions.update({name:('float',['float']) for name in ('__c6_sin','__c6_cos','__c6_tan')})
+   cold_math=next(functions for label,functions in GROUPS if label=='state')
+   cold_math.update({'__c6_atan':('float',['float']),'__c6_exp':('float',['float']),
+                     '__c6_fscale':('uint32_t',['uint32_t','int']),
+                     'sb_pow':('float',['float','float'])})
   GROUPS.append(('bytecode-run',vm_functions))
   GROUPS.append(('display',{'writenumber2':('uint16_t',['char *','float']),
                            'tinydtostrf':('uint16_t',['float','int','char *']),
@@ -146,7 +160,7 @@ def main():
  input_hashes={}
  for path in inputs:
   content=path.read_bytes();digest.update(content);input_hashes[str(path)]=hashlib.sha256(content).hexdigest()
- digest.update(str((args.stack_size,args.memory,args.script,args.commands,args.mmu_bytes,args.profile,args.no_auto_inline,args.no_lto,args.vm_c)).encode())
+ digest.update(str((args.stack_size,args.memory,args.script,args.commands,args.mmu_bytes,args.profile,args.no_auto_inline,args.no_lto,args.vm_c,args.vm_math)).encode())
  identity=digest.digest()[:4];idtext=identity.hex().upper();module_name='M'+idtext
  if len(GROUPS)>16:raise ValueError('overlay filename scheme supports sixteen groups')
  group_names=['O'+format(i,'X')+idtext for i in range(len(GROUPS))]

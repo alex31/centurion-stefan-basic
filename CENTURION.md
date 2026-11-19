@@ -33,6 +33,11 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
   loops with exact whole-number values and a unit increment can advance
   their binary32 representation directly. Other steps and fractional or
   out-of-range values use the full floating-point operations.
+- The distribution keeps trigonometric reduction and logarithms mapped
+  during bytecode execution and places sine, cosine and tangent with the
+  VM. Finite real squares use the native binary32 multiplication path.
+  The compact build keeps the 4 KiB program arena and the 20 KiB CENTOS
+  module budget.
 - The CPU6 assembly dispatch loop keeps the instruction and value-stack
   pointers in registers. It copies real literals and scalars directly and
   handles common indexed operations and integer arithmetic. Real-to-integer
