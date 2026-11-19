@@ -1,5 +1,4 @@
 #include "bytecode.h"
-#include "work.h"
 
 static int eat(struct ib_compile *c, token_t token)
 {
@@ -88,8 +87,9 @@ void ib_declare_int(struct ib_compile *c)
             c->error = IB_RANGE;
             return;
         }
+        ib_state.integer_literals = 1;
         for (v = low; v <= high; ++v)
-            bas_work.ib.type[v] = IB_INT;
+            ib_state.type[v] = IB_INT;
         if (c->token != ',')
             return;
         ib_take(c);
@@ -111,19 +111,19 @@ void ib_dimension(struct ib_compile *c)
         bound = literal(c, MEMSIZE / 2 - 1);
         if (!eat(c, ')') || c->error)
             return;
-        if (bas_work.ib.array[v].data) {
+        if (ib_state.array[v].data) {
             c->error = IB_TYPE;
             return;
         }
-        width = bas_work.ib.type[v] == IB_INT ? 2 : 4;
+        width = ib_state.type[v] == IB_INT ? 2 : 4;
         bytes = width * (bound + 1);
         if (bytes > c->program.data - c->out) {
             c->error = IB_MEMORY;
             return;
         }
         c->program.data -= bytes;
-        bas_work.ib.array[v].data = ib_array_at(c->program.data);
-        bas_work.ib.array[v].count = bound + 1;
+        ib_state.array[v].data = ib_array_at(c->program.data);
+        ib_state.array[v].count = bound + 1;
         if (c->token != ',')
             return;
         ib_take(c);
@@ -132,13 +132,13 @@ void ib_dimension(struct ib_compile *c)
 
 void ib_assign(struct ib_compile *c)
 {
-    unsigned array = c->token == ARRAYVAR;
+    unsigned array = c->token == ARRAYVAR, string = c->token == STRINGVAR;
     unsigned v = ib_variable(c);
-    unsigned t = bas_work.ib.type[v];
+    unsigned t = string ? IB_STRING : ib_state.type[v];
     unsigned start, index_var = 255;
     ib_take(c);
     if (array) {
-        if (!bas_work.ib.array[v].data) {
+        if (!ib_state.array[v].data) {
             c->error = IB_TYPE;
             return;
         }
@@ -159,6 +159,16 @@ void ib_assign(struct ib_compile *c)
         return;
     start = c->out;
     ib_coerce(c, ib_expr(c), t);
+    if (string && !c->error && c->out - start == 6 &&
+        mem[start] == IB_SLOAD && (unsigned char)mem[start + 1] == v &&
+        mem[start + 2] == IB_SLITERAL && mem[start + 5] == IB_SCAT) {
+        /* A$=A$+literal needs neither a stack value nor a temporary string. */
+        mem[start] = IB_SAPPEND;
+        mem[start + 2] = mem[start + 3];
+        mem[start + 3] = mem[start + 4];
+        c->out = start + 4;
+        return;
+    }
     if (index_var != 255) {
         if (!c->error && c->out - start == 3 && mem[start] == IB_CONST) {
             mem[start] = IB_PUT_CONST;  /* retain the immediate word */
@@ -173,22 +183,27 @@ void ib_assign(struct ib_compile *c)
         ib_emit(c, IB_ARRAY_OFFSET(v));
         return;
     }
-    ib_emit(c, array ? IB_PUT : t == IB_INT ? IB_ISTORE : IB_STORE);
-    ib_emit(c, array ? v | (t == IB_REAL ? 128 : 0) : IB_SCALAR_OFFSET(v));
+    ib_emit(c, array ? IB_PUT : string ? IB_SSTORE : t == IB_INT ? IB_ISTORE : IB_STORE);
+    ib_emit(c, array ? v | (t == IB_REAL ? 128 : 0) : string ? v : IB_SCALAR_OFFSET(v));
 }
 
 void ib_print_stmt(struct ib_compile *c)
 {
     unsigned newline = 1, type;
+    token_t following;
     while (!c->error && !end_statement(c)) {
-        if (c->token == STRING) {
+        following = c->next < top ? mem[c->next] : EOL;
+        if (c->token == STRING &&
+            (following == EOL || following == LINENUMBER || following == ':' ||
+             following == ';' || following == ',')) {
             ib_emit(c, IB_TEXT);
             ib_word(c, c->source + 1);
             ib_take(c);
         } else {
             type = ib_expr(c);
-            ib_emit(c, IB_PRINT);
-            ib_emit(c, type);
+            ib_emit(c, type == IB_STRING ? IB_SPRINT : IB_PRINT);
+            if (type != IB_STRING)
+                ib_emit(c, type);
         }
         newline = c->token != ';' && c->token != ',';
         if (newline)
@@ -213,7 +228,7 @@ void ib_for_stmt(struct ib_compile *c)
         return;
     }
     v = ib_variable(c);
-    t = bas_work.ib.type[v];
+    t = ib_state.type[v];
     ib_take(c);
     if (!eat(c, '='))
         return;
@@ -262,27 +277,33 @@ void ib_stmt(struct ib_compile *c)
 {
     unsigned start, patch, type, v, line;
     token_t token = c->token;
-    if (token != VARIABLE && token != ARRAYVAR)
+    if (token != VARIABLE && token != ARRAYVAR && token != STRINGVAR)
         ib_take(c);
     switch (token) {
     case TREM:
         while (c->token != LINENUMBER && c->token != EOL)
             ib_take(c);
         break;
-    case TLET: case VARIABLE: case ARRAYVAR:
+    case TLET: case VARIABLE: case ARRAYVAR: case STRINGVAR:
         ib_assign(c);
         break;
     case TPRINT: ib_print_stmt(c); break;
-    case TINPUT:
-        if (c->token != VARIABLE) {
+    case TINPUT: {
+        if (c->token != VARIABLE && c->token != STRINGVAR) {
             c->error = IB_TYPE;
             break;
         }
         v = ib_variable(c);
+        if (c->token == STRINGVAR) {
+            ib_emit(c, IB_SINPUT);
+            ib_emit(c, v);
+        } else {
+            ib_emit(c, IB_INPUT);
+            ib_emit(c, v | (ib_state.type[v] == IB_REAL ? 128 : 0));
+        }
         ib_take(c);
-        ib_emit(c, IB_INPUT);
-        ib_emit(c, v | (bas_work.ib.type[v] == IB_REAL ? 128 : 0));
         break;
+    }
     case TGOTO: case TGOSUB:
         line = literal(c, 65535);
         if (!c->error) {
@@ -297,6 +318,10 @@ void ib_stmt(struct ib_compile *c)
         unsigned numeric, direct, mask = 0;
         start = c->out;
         type = ib_expr(c);
+        if (type == IB_STRING) {
+            c->error = IB_TYPE;
+            break;
+        }
         if (!eat(c, TTHEN))
             break;
         numeric = c->token == NUMBER;
@@ -407,11 +432,6 @@ int ib_compile(struct ib_program *program, unsigned start_line)
     program->line = 0;
     for (i = 0; i < sizeof c; ++i)
         ((uint8_t *)&c)[i] = 0;
-    for (i = 0; i < sizeof(bas_work.ib); ++i)
-        ((uint8_t *)&bas_work.ib)[i] = 0;
-    for (i = 0; i < sizeof bas_work.ib.type; ++i)
-        bas_work.ib.type[i] = IB_REAL;
-
     for (p = 0; p < top; ) {
         if (mem[p] == LINENUMBER)
             ++count;
@@ -449,6 +469,31 @@ int ib_compile(struct ib_program *program, unsigned start_line)
         if (!c.error)
             c.program.start = IB_WORD(p);
     }
+    c.program.end = c.out;
+    *program = c.program;
+    return c.error;
+}
+
+
+int ib_compile_immediate(struct ib_program *program, unsigned source, unsigned limit)
+{
+    struct ib_compile c;
+    unsigned i;
+    for (i = 0; i < sizeof c; ++i)
+        ((uint8_t *)&c)[i] = 0;
+    c.next = source;
+    c.program.start = c.out = top;
+    c.program.data = limit;
+    ib_take(&c);
+    while (!c.error && c.token != EOL) {
+        ib_stmt(&c);
+        if (!c.error && c.token != EOL)
+            eat(&c, ':');
+    }
+    if (!c.error && c.loops)
+        c.error = IB_LOOP;
+    if (!c.error)
+        ib_emit(&c, IB_END);
     c.program.end = c.out;
     *program = c.program;
     return c.error;

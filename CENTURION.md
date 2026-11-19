@@ -8,9 +8,18 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
 - The interpreter stores tokenized lines in a 4 KiB RAM arena and reads and
   writes native CENTOS text files. The console supports line editing, `.DIR`,
   `.LOAD`, `.SAVE` and `.RENUM`.
-- The CENTOS application uses SDCC's float32 runtime, a mapped module and
-  partial overlays. Untyped programs and prompt commands use the interpreter.
-  Programs with `DEFINT` or `DIM` headers can run through a typed bytecode VM.
+- The compiler and bytecode VM execute stored programs and direct commands.
+  Unqualified numeric variables start as float32. A `DEFINT` header selects
+  16-bit integers for the named variables, and `DIM` supports numeric arrays.
+  The VM includes real arithmetic, comparisons, power and the scalar math
+  functions used by the console build.
+- `A$` through `Z$` are independent string variables. They support assignment,
+  concatenation, comparison, input and output, and the functions `LEN`,
+  `ASC`, `CHR$`, `LEFT$`, `RIGHT$`, `MID$`, `STR$` and `VAL`. Each string
+  can contain up to 255 characters. The variables share 4 KiB of string
+  storage. The VM uses an additional bounded buffer for temporary results.
+- The REPL and line editor share a code overlay. The compiler and VM run
+  from their own overlays while variables live in permanent RAM.
 - The CPU6 assembly dispatch loop keeps the instruction and value-stack
   pointers in registers. It combines common indexed operations and handles
   the arithmetic hot path before falling back to C for float32 and I/O.

@@ -14,7 +14,6 @@ struct bas_literal {
 union bas_work_area {
  uint32_t alignment;
  unsigned char bytes[448];
- struct ib_state ib;
  struct {unsigned char origin[128];struct bas_literal numbers[64];unsigned count;} editor;
 #ifdef __CPU6_OS6__
  FILE_OS6 file;

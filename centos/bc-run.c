@@ -1,5 +1,4 @@
 #include "bytecode.h"
-#include "work.h"
 
 #ifdef STBASIC_VM_ASM
 struct ib_cursor {
@@ -9,7 +8,7 @@ struct ib_cursor {
     uint16_t budget;
 };
 int ib_dispatch(struct ib_cursor *);
-#define IB_MEMBER(member) ((uint8_t *)&bas_work + __builtin_offsetof(struct ib_state, member))
+#define IB_MEMBER(member) ((uint8_t *)&ib_state + __builtin_offsetof(struct ib_state, member))
 ib_value *const ib_stack_end = (ib_value *)(IB_MEMBER(stack) + STACKSIZE * sizeof(ib_value));
 struct ib_array *const ib_arrays = (struct ib_array *)IB_MEMBER(array);
 struct ib_loop *const ib_loops = (struct ib_loop *)IB_MEMBER(loops);
@@ -47,7 +46,7 @@ static inline void vm_write_word(uint8_t *p, unsigned value)
 
 static inline ib_value *scalar_at(unsigned offset)
 {
-    return (ib_value *)((uint8_t *)bas_work.ib.scalar + offset);
+    return (ib_value *)((uint8_t *)ib_state.scalar + offset);
 }
 
 static int integer_compare(unsigned op, int16_t a, int16_t b)
@@ -131,8 +130,8 @@ int ib_execute(struct ib_program *program)
 {
     uint8_t *base = (uint8_t *)mem;
     const uint8_t *ip = base + program->start, *end = base + program->end;
-    ib_value *sp = bas_work.ib.stack;
-    struct ib_loop *loops = bas_work.ib.loops;
+    ib_value *sp = ib_state.stack;
+    struct ib_loop *loops = ib_state.loops;
     unsigned ret_sp = 0;
     unsigned op, arg, p, n;
     int status = IB_OK, result;
@@ -144,7 +143,8 @@ int ib_execute(struct ib_program *program)
     unsigned budget = 64;
 #endif
 
-    for (p = program->data; p < MEMSIZE; ++p) {
+    ib_strings_begin();
+    for (p = program->data; program->lines && p < MEMSIZE; ++p) {
         mem[p] = 0;
         if (!(p & 63))
             byield();
@@ -181,7 +181,7 @@ int ib_execute(struct ib_program *program)
         case IB_CONST: case IB_ILOAD:
 #endif
         case IB_LITERAL: case IB_LOAD:
-            if (sp == bas_work.ib.stack + STACKSIZE) {
+            if (sp == ib_state.stack + STACKSIZE) {
                 status = IB_STACK;
                 goto done;
             }
@@ -221,9 +221,9 @@ int ib_execute(struct ib_program *program)
             if (op == IB_PUT)
                 --sp;
             index = (uint16_t)sp[-1].integer;
-            if (!bas_work.ib.array[v].data || index >= bas_work.ib.array[v].count)
+            if (!ib_state.array[v].data || index >= ib_state.array[v].count)
                 goto range;
-            array = ib_array_data(bas_work.ib.array[v].data);
+            array = ib_array_data(ib_state.array[v].data);
             if (ip[1] & 128) {
                 p = (unsigned)(array - base) + 4 * index;
                 if (op == IB_INDEX)
@@ -249,13 +249,13 @@ int ib_execute(struct ib_program *program)
             if (op == IB_PUT_CONST) {
                 value = vm_word(ip + 1);
                 index = (uint16_t)scalar_at(ip[3])->integer;
-                destination = &bas_work.ib.array[ip[4] / sizeof(struct ib_array)];
+                destination = &ib_state.array[ip[4] / sizeof(struct ib_array)];
             } else {
-                struct ib_array *source = &bas_work.ib.array[ip[2] / sizeof(struct ib_array)];
+                struct ib_array *source = &ib_state.array[ip[2] / sizeof(struct ib_array)];
                 index = (uint16_t)scalar_at(ip[1])->integer;
                 if (index >= source->count) goto range;
                 value = vm_word(ib_array_data(source->data) + 2 * index);
-                destination = &bas_work.ib.array[ip[3] / sizeof(struct ib_array)];
+                destination = &ib_state.array[ip[3] / sizeof(struct ib_array)];
             }
             if (index >= destination->count) goto range;
             vm_write_word(ib_array_data(destination->data) + 2 * index, value);
@@ -266,7 +266,7 @@ int ib_execute(struct ib_program *program)
             uint16_t index = (uint16_t)scalar_at(ip[1])->integer;
             unsigned v = ip[2] / sizeof(struct ib_array);
             uint8_t *element;
-            if (op != IB_PUT_VAR && sp == bas_work.ib.stack + STACKSIZE) {
+            if (op != IB_PUT_VAR && sp == ib_state.stack + STACKSIZE) {
                 status = IB_STACK;
                 goto done;
             }
@@ -276,9 +276,9 @@ int ib_execute(struct ib_program *program)
                 if (index & delta & 0x8000u) goto range;
                 index = (uint16_t)(index + delta);
             }
-            if (index >= bas_work.ib.array[v].count)
+            if (index >= ib_state.array[v].count)
                 goto range;
-            element = ib_array_data(bas_work.ib.array[v].data) + 2u * index;
+            element = ib_array_data(ib_state.array[v].data) + 2u * index;
             if (op == IB_PUT_VAR) {
                 --sp;
                 vm_write_word(element, (uint16_t)sp->integer);
@@ -326,6 +326,7 @@ int ib_execute(struct ib_program *program)
             --sp;
             break;
         case IB_FADD: case IB_FSUB: case IB_FMUL: case IB_FDIV:
+        case IB_FPOW: case IB_FMOD:
         case IB_FEQ: case IB_FNE: case IB_FLT: case IB_FLE: case IB_FGT: case IB_FGE:
             --sp;
             status = ib_float(op, sp - 1, sp);
@@ -333,6 +334,8 @@ int ib_execute(struct ib_program *program)
             break;
         case IB_FTOP: case IB_FLEFT: case IB_ITOP: case IB_ILEFT: case IB_FNEG:
         case IB_FSQR: case IB_FSIN: case IB_FCOS: case IB_FTAN:
+        case IB_FABS: case IB_FINT: case IB_FSGN: case IB_FATAN:
+        case IB_FLOG: case IB_FEXP: case IB_FRND:
             status = ib_float(op, sp - 1, sp - 1);
             if (status || er || stb_done) goto done;
             break;
@@ -365,17 +368,17 @@ int ib_execute(struct ib_program *program)
                 status = IB_STACK;
                 goto done;
             }
-            bas_work.ib.returns[ret_sp++] = (unsigned)(ip - base) + 3;
+            ib_state.returns[ret_sp++] = (unsigned)(ip - base) + 3;
             /* fall through */
         case IB_JUMP:
             ip = base + vm_word(ip + 1);
             continue;
         case IB_RETURN:
             if (!ret_sp) goto bad_loop;
-            ip = base + bas_work.ib.returns[--ret_sp];
+            ip = base + ib_state.returns[--ret_sp];
             continue;
         case IB_FOR:
-            if (loops == bas_work.ib.loops + FORDEPTH) goto bad_loop;
+            if (loops == ib_state.loops + FORDEPTH) goto bad_loop;
             arg = ip[1];
             var = scalar_at(arg & 127);
             loops->variable = arg;
@@ -401,7 +404,7 @@ int ib_execute(struct ib_program *program)
             continue;
         case IB_NEXT:
             arg = ip[1];
-            if (loops == bas_work.ib.loops || loops[-1].variable != arg) goto bad_loop;
+            if (loops == ib_state.loops || loops[-1].variable != arg) goto bad_loop;
             result = loop_in_range(loops - 1, scalar_at(arg & 127), 1);
             if ((arg & 128) && (er || stb_done)) goto done;
             if (result < 0) goto range;
@@ -412,6 +415,92 @@ int ib_execute(struct ib_program *program)
                 ip += 2;
             }
             continue;
+        case IB_SLITERAL: case IB_SLOAD:
+            if (sp == ib_state.stack + STACKSIZE) {
+                status = IB_STACK;
+                goto done;
+            }
+            if (op == IB_SLITERAL) {
+                p = vm_word(ip + 1);
+                sp->string.length = base[p++];
+                sp->string.location = p;
+                ip += 3;
+            } else {
+                ib_string_load(ip[1], &sp->string);
+                ip += 2;
+            }
+            ++sp;
+            continue;
+        case IB_SSTORE:
+            --sp;
+            status = ib_string_store(ip[1], &sp->string);
+            if (status) goto done;
+            ip += 2;
+            continue;
+        case IB_SAPPEND:
+            status = ib_string_append_literal(ip[1], vm_word(ip + 2));
+            if (status) goto done;
+            ip += 4;
+            continue;
+        case IB_SCAT:
+            /* A store can consume the concatenation without a temporary.
+               The helper can then append in place for A$=A$+text. */
+            arg = ip[1] == IB_SSTORE ? ip[2] : IB_STRING_VARIABLES;
+            --sp;
+            status = ib_string_join(&sp[-1].string, &sp->string, arg);
+            if (status) goto done;
+            if (arg < IB_STRING_VARIABLES) {
+                --sp;
+                ip += 3;
+                continue;
+            }
+            break;
+        case IB_SCMP:
+            --sp;
+            result = ib_string_compare(&sp[-1].string, &sp->string);
+            sp[-1].integer = -integer_compare(ip[1], result, 0);
+            ip += 2;
+            continue;
+        case IB_SPRINT:
+            ib_string_print(&(--sp)->string);
+            if (er || stb_done) goto done;
+            break;
+        case IB_SINPUT:
+            status = ib_string_input(ip[1]);
+            if (status || er || stb_done) goto done;
+            ip += 2;
+            continue;
+        case IB_SLEN:
+            sp[-1].integer = (int16_t)ib_string_length(&sp[-1].string);
+            break;
+        case IB_SASC:
+            result = ib_string_asc(&sp[-1].string);
+            if (result < 0) goto range;
+            sp[-1].integer = result;
+            break;
+        case IB_SCHR:
+            status = ib_string_chr(&sp[-1].string, sp[-1].integer);
+            if (status) goto done;
+            break;
+        case IB_SSTR:
+            status = ib_string_number(&sp[-1].string, sp[-1].real);
+            if (status || er || stb_done) goto done;
+            break;
+        case IB_SVAL:
+            status = ib_string_value(&sp[-1].string, &sp[-1].real);
+            if (status || er || stb_done) goto done;
+            break;
+        case IB_SLEFT: case IB_SRIGHT: case IB_SMID:
+            --sp;
+            result = sp[0].integer;
+            if (op == IB_SMID) {
+                --sp;
+                status = ib_string_slice(&sp[-1].string, op, sp[0].integer, result);
+            } else {
+                status = ib_string_slice(&sp[-1].string, op, 1, result);
+            }
+            if (status) goto done;
+            break;
         case IB_TEXT:
             p = vm_word(ip + 1);
             n = base[p++];
@@ -431,7 +520,7 @@ int ib_execute(struct ib_program *program)
             break;
         case IB_INPUT:
             arg = ip[1];
-            status = ib_input(arg & 128, &bas_work.ib.scalar[arg & 127]);
+            status = ib_input(arg & 128, &ib_state.scalar[arg & 127]);
             if (status || er || stb_done) goto done;
             ip += 2;
             continue;

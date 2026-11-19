@@ -264,6 +264,17 @@ const char scam[]	PROGMEM = "CAM";
 #endif
 
 
+#ifdef STBASIC_COMMANDS
+static const char vm_len[] PROGMEM = "LEN";
+static const char vm_asc[] PROGMEM = "ASC";
+static const char vm_chr[] PROGMEM = "CHR$";
+static const char vm_left[] PROGMEM = "LEFT$";
+static const char vm_right[] PROGMEM = "RIGHT$";
+static const char vm_mid[] PROGMEM = "MID$";
+static const char vm_str[] PROGMEM = "STR$";
+static const char vm_val[] PROGMEM = "VAL";
+#endif
+
 /* zero terminated keyword storage */
 const char* const keyword[] PROGMEM = {
   sge, sle, sne, sprint, slet, sinput,
@@ -357,6 +368,9 @@ const char* const keyword[] PROGMEM = {
   shelp,
 #endif
   sshl, sshr, sbit,
+#ifdef STBASIC_COMMANDS
+  vm_len, vm_asc, vm_chr, vm_left, vm_right, vm_mid, vm_str, vm_val,
+#endif
 #ifdef HASCAMERA
   scam,
 #endif
@@ -453,6 +467,9 @@ const token_t tokens[] PROGMEM = {
   THELP,
 #endif
   TSHL, TSHR, TBIT,
+#ifdef STBASIC_COMMANDS
+  TLEN, TASC, TCHR, TLEFT, TRIGHT, TMID, TSTR, TVAL,
+#endif
 #ifdef HASCAMERA
   TCAM,
 #endif
@@ -3950,29 +3967,44 @@ void diag() {
    as interactive input. Its larger I/O record is independent of ibuffer. */
 #ifdef STBASIC_COMMANDS
 unsigned bas_staged_line;
+
+static int stage_tokens(char *text, unsigned line)
+{
+  address_t original=top,length;
+  unsigned ticks=0;
+  bi=text;st=SINT;lexliteral=0;
+  line_origin=original;line_staging=1;
+  if(line) {
+    token=LINENUMBER;ax=line;storetoken();
+  }
+  lex_input();
+  while (token != EOL && !er) {
+    storetoken();
+    if (!(++ticks & 15u)) fastticker();
+    lex_input();
+  }
+  line_staging=0;length=top-original;top=original;lexliteral=0;here=0;
+  return er?-1:(int)length;
+}
+
+int bas_stage_immediate(char *text)
+{
+  return stage_tokens(text, 0);
+}
+
 int bas_stage(char *text)
 {
-  address_t original=top,length;unsigned n=0,ticks=0;
+  unsigned n=0;
   while(*text==' '||*text=='\t')text++;
   if(!*text)return 0;
   if(*text<'0'||*text>'9')return -1;
   while(*text>='0'&&*text<='9'){
     if(n>6553U||(n==6553U&&*text>'5'))return -1;
-    n=n*10U+(*text++-'0');
+    n=n*10U+(unsigned)(*text++-'0');
   }
-  if(!n||*text=='.'||*text=='E'||*text=='e')return -1;
-  while(*text==' '||*text=='\t')text++;
-  if(!*text)return 0;
-  bas_staged_line=n;bi=text;st=SINT;lexliteral=0;
-  line_origin=original;line_staging=1;ax=n;token=LINENUMBER;
-  do {
-    storetoken();
-    if (er) break;
-    if (!(++ticks & 15u)) fastticker();
-    lex_input();
-  } while (token != EOL);
-  line_staging=0;length=top-original;top=original;lexliteral=0;here=0;
-  return er?-1:(int)length;
+  if(!n)return -1;
+  bas_staged_line=n;
+  return stage_tokens(text,n);
 }
 void bas_copy(unsigned offset,unsigned length)
 {unsigned i;for(i=0;i<length;i++){mem[offset+i]=line_tokens[i];if(!(i&63))byield();}}
@@ -4011,7 +4043,15 @@ void storeline() {
     line_staging=0;length=top-original;top=original;
     if(er){here=0;return;}
   }
+#ifdef STBASIC_COMMANDS
+  if(length>memsize-(original-(end-start))){error(EOUTOFMEMORY);here=0;return;}
+  if(length || end!=start) {
+    extern void ib_clear_arrays(void);
+    ib_clear_arrays();
+  }
+#else
   if(length>himem-(original-(end-start))){error(EOUTOFMEMORY);here=0;return;}
+#endif
   if(length>end-start){
     delta=length-(end-start);
     for(at=original;at>end;at--){mem[at+delta-1]=mem[at-1];if(!(at&63))byield();}
@@ -7277,20 +7317,6 @@ void xrun() {
       error(EARGS);
       return;
     }
-#ifdef STBASIC_COMMANDS
-    {
-      extern int bas_is_typed(void);
-      extern void bas_run_typed(unsigned);
-      if (st == SINT && bas_is_typed()) {
-        number_t start = args ? pop() : 0;
-        if (!(start >= 0 && start <= 65535.0f) || start != (address_t)start)
-          error(ELINE);
-        else
-          bas_run_typed((address_t)start);
-        return;
-      }
-    }
-#endif
     if (args == 0) {
       here = 0;
     } else {
@@ -11197,6 +11223,7 @@ void setup() {
 */
 void loop() {
 
+#ifndef STBASIC_COMMANDS
   /*
    	autorun state was found in setup, autorun now but only once
    	autorun BASIC programs return to interactive after completion
@@ -11215,6 +11242,7 @@ void loop() {
     st = SINT;
   }
 
+#endif
   /* always return to default io channels once interactive mode is reached */
   iodefaults();
   form = 0;
@@ -11249,8 +11277,39 @@ void loop() {
     setaddress(1, beupdate, top);
 #endif
   } else {
-    /* st=SINT; */
+#ifdef STBASIC_COMMANDS
+    extern void bas_run_immediate(char *);
+    extern void bas_run_program(unsigned);
+    if (token == TRUN) {
+      nexttoken();
+      if (token == EOL)
+        bas_run_program(0);
+      else if (token == NUMBER && x>=1.0f && x<=65535.0f && x==(number_t)(address_t)x) {
+        unsigned line=(address_t)x;
+        nexttoken();
+        if (token == EOL) bas_run_program(line);
+        else error(ELINE);
+      } else error(ELINE);
+    } else if (token == TLIST) {
+      nexttoken();
+      if (token == EOL) listlines(0,65535U);
+      else if (token == NUMBER && x>=1.0f && x<=65535.0f && x==(number_t)(address_t)x) {
+        unsigned line=(address_t)x;
+        nexttoken();
+        if (token == EOL) { listlines(line,line); outcr(); }
+        else error(ELINE);
+      } else error(ELINE);
+    } else if (token == TNEW) {
+      extern void ib_reset(void);
+      nexttoken();
+      if (token == EOL) { xnew(); ib_reset(); }
+      else error(EUNKNOWN);
+    } else if (token != EOL) {
+      bas_run_immediate(ibuffer+1);
+    }
+#else
     statement();
+#endif
     st = SINT;
   }
 

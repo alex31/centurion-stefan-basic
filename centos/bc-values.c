@@ -1,4 +1,7 @@
 #include "bytecode.h"
+extern float sb_pow(float, float);
+extern float sb_mod(float, float);
+extern void xrnd(void);
 
 int ib_float(unsigned op, ib_value *a, ib_value *b)
 {
@@ -26,6 +29,15 @@ int ib_float(unsigned op, ib_value *a, ib_value *b)
             return IB_DIVZERO;
         a->real = left / right;
         break;
+    case IB_FPOW: a->real = sb_pow(left, right); break;
+    case IB_FMOD: a->real = sb_mod(left, right); break;
+    case IB_FABS: a->real = fabsf(left); break;
+    case IB_FINT: a->real = floorf(left); break;
+    case IB_FSGN: a->real = left < 0.0f ? -1.0f : left > 0.0f ? 1.0f : 0.0f; break;
+    case IB_FATAN: a->real = atanf(left); break;
+    case IB_FLOG: a->real = logf(left); break;
+    case IB_FEXP: a->real = expf(left); break;
+    case IB_FRND: push(left); xrnd(); a->real = pop(); break;
     case IB_FNEG: a->real = -left; break;
     case IB_FSQR: a->real = sqrtf(left); break;
     case IB_FSIN: a->real = sinf(left); break;

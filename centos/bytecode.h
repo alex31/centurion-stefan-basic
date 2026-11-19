@@ -3,7 +3,7 @@
 
 #include "app.h"
 
-enum ib_type { IB_BAD, IB_INT, IB_REAL };
+enum ib_type { IB_BAD, IB_INT, IB_REAL, IB_STRING };
 enum ib_status { IB_OK, IB_SYNTAX, IB_MEMORY, IB_TYPE, IB_RANGE, IB_BRANCH,
                  IB_LOOP, IB_STACK, IB_DIVZERO };
 enum ib_op {
@@ -13,7 +13,9 @@ enum ib_op {
     IB_OP_COUNT
 };
 
-typedef union { int16_t integer; number_t real; } ib_value;
+#define IB_STRING_VARIABLES 26
+struct ib_string { uint16_t location, length; };
+typedef union { int16_t integer; number_t real; struct ib_string string; } ib_value;
 #define IB_SCALAR_OFFSET(v) ((v) * sizeof(ib_value))
 struct ib_loop {
     ib_value limit, step;
@@ -38,8 +40,10 @@ struct ib_state {
     struct ib_loop loops[FORDEPTH];
     struct ib_array array[26];
     uint16_t returns[GOSUBDEPTH];
-    uint8_t type[26];
+    uint8_t type[26], integer_literals;
 };
+
+extern struct ib_state ib_state;
 
 struct ib_program {
     unsigned table, lines, start, end, data;
@@ -59,8 +63,11 @@ struct ib_compile {
 #define IB_WORD(p) (((unsigned)(uint8_t)mem[(p)] << 8) | (uint8_t)mem[(p) + 1])
 #define IB_SET(p,v) do { mem[(p)] = (mem_t)((unsigned)(v) >> 8); mem[(p) + 1] = (mem_t)(v); } while (0)
 
-int bas_is_typed(void);
-void bas_run_typed(unsigned);
+void bas_run_program(unsigned);
+void bas_run_immediate(char *);
+void ib_reset(void);
+void ib_clear_arrays(void);
+int ib_compile_immediate(struct ib_program *, unsigned, unsigned);
 int ib_compile(struct ib_program *, unsigned);
 int ib_execute(struct ib_program *);
 void ib_take(struct ib_compile *);
@@ -73,4 +80,19 @@ int ib_float(unsigned, ib_value *, ib_value *);
 void ib_print(unsigned, ib_value *);
 int ib_input(unsigned, ib_value *);
 int ib_for_real(struct ib_loop *, ib_value *, unsigned);
+void ib_strings_reset(void);
+void ib_strings_begin(void);
+void ib_string_load(unsigned, struct ib_string *);
+int ib_string_store(unsigned, const struct ib_string *);
+int ib_string_join(struct ib_string *, const struct ib_string *, unsigned);
+int ib_string_append_literal(unsigned, unsigned);
+int ib_string_compare(const struct ib_string *, const struct ib_string *);
+void ib_string_print(const struct ib_string *);
+int ib_string_input(unsigned);
+unsigned ib_string_length(const struct ib_string *);
+int ib_string_asc(const struct ib_string *);
+int ib_string_chr(struct ib_string *, int);
+int ib_string_number(struct ib_string *, number_t);
+int ib_string_value(const struct ib_string *, number_t *);
+int ib_string_slice(struct ib_string *, unsigned, int, int);
 #endif

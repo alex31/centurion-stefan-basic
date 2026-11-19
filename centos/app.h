@@ -22,6 +22,7 @@ void resetbasicstate(void);
 unsigned bas_parse(const char *);
 int bas_command(char *);
 unsigned bas_next(unsigned);
+int bas_stage_immediate(char *);
 unsigned bas_line(unsigned);
 unsigned bas_renum(unsigned);
 void bas_editor(unsigned);

@@ -1,4 +1,4 @@
-#include "app.h"
+#include "bytecode.h"
 uint16_t bas_arg;
 char bas_name[BAS_PATTERN_MAX + 1],bas_current[11];
 static char upper(char c) {return c>='a'&&c<='z'?c-'a'+'A':c;}
@@ -22,7 +22,7 @@ unsigned bas_parse(const char *p)
  else if(equal(command,"BYE"))op=BC_BYE;
  else if(equal(command,"HELP"))op=BC_HELP;
  else goto syntax;
- if(op==BC_LIST||op==BC_EDIT||op==BC_RENUM){
+ if(op==BC_RUN||op==BC_LIST||op==BC_EDIT||op==BC_RENUM){
   n=0;while(*p>='0'&&*p<='9'){
    if(value>6553U||(value==6553U&&*p>'5'))goto syntax;
    value=value*10U+(*p++-'0');n++;
@@ -67,7 +67,7 @@ syntax: puts("Command syntax error; .HELP");return BC_ERROR;
 }
 
 /* Permanent dispatcher: every cold operation returns before the next group
-   replaces its code. RUN re-enters the original interpreter's normal REPL. */
+   replaces its code. RUN compiles the stored program before entering the VM. */
 int bas_command(char *line)
 {
  unsigned op;
@@ -76,12 +76,12 @@ int bas_command(char *line)
  op=bas_parse(line);
  switch(op){
  case BC_NONE:return 0;
- case BC_RUN:ibuffer[0]=3;ibuffer[1]='R';ibuffer[2]='U';ibuffer[3]='N';ibuffer[4]=0;return 0;
+ case BC_RUN:bas_run_program(bas_arg);break;
  case BC_LIST:listlines(bas_arg,bas_arg?bas_arg:65535U);if(bas_arg)outcr();break;
- case BC_NEW:xnew();bas_current[0]=0;break;
- case BC_RENUM:if(bas_renum(bas_arg)){resetbasicstate();puts("Renumbered");}break;
+ case BC_NEW:xnew();ib_reset();bas_current[0]=0;break;
+ case BC_RENUM:if(bas_renum(bas_arg)){resetbasicstate();ib_reset();puts("Renumbered");}break;
  case BC_EDIT:bas_editor(bas_arg);break;
- case BC_SAVE:case BC_LOAD:case BC_DIR:if(bas_query(op))bas_files(op);if(bas_pending)bas_publish();if(bas_loaded)resetbasicstate();break;
+ case BC_SAVE:case BC_LOAD:case BC_DIR:if(bas_query(op))bas_files(op);if(bas_pending)bas_publish();if(bas_loaded){resetbasicstate();ib_reset();}break;
  case BC_BYE:stb_done=1;break;
  case BC_HELP:break;
  }

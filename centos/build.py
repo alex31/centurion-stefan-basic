@@ -61,7 +61,7 @@ def maps(path):
 def main():
  parser=argparse.ArgumentParser(description=__doc__)
  parser.add_argument('-o',required=True,type=Path)
- parser.add_argument('--commands',action='store_true')
+ parser.add_argument('--commands',action='store_true',help='build the CENTOS REPL and bytecode VM with float32 and strings')
  parser.add_argument('--file-service',type=Path,default=HERE/'files.c')
  parser.add_argument('--script',action='store_true',help='build the deterministic core qualification input')
  parser.add_argument('--stack-size',type=int,default=3072)
@@ -82,15 +82,17 @@ def main():
  output.parent.mkdir(parents=True,exist_ok=True)
  sources=[ROOT/'swext/stefan-basic/src/basic.c',HERE/'runtime.c',HERE/'main.c',HERE/'power.c',HERE/'decimal.c']
  if args.commands:
-  sources += [HERE/n for n in ['commands.c','program.c','editor.c','fileio.c','text.c','bytecode.c','bc-compile.c','bc-expr.c','bc-run.c','bc-values.c']]+[args.file_service.resolve()]
+  sources += [HERE/n for n in ['commands.c','program.c','editor.c','fileio.c','text.c','bytecode.c','bc-compile.c','bc-expr.c','bc-run.c','bc-values.c','bc-strings.c']]+[args.file_service.resolve()]
   # Read and tokenize every text record in the same slot, including the
   # exact numeric parser, from the first open to the second close.
   GROUPS[0][1].update({'bas_stage':('int',['char *']),'bas_copy':('void',['unsigned','unsigned']),
    'bas_read_source':('int',['const char *','unsigned']), 'bas_io_read':('int',[]),
    'bas_io_open':('int',['const char *','unsigned']),
-   'bas_atof':('unsigned',['const char *','float *'])})
+   'bas_atof':('unsigned',['const char *','float *']),
+   'bas_stage_immediate':('int',['char *'])})
   GROUPS[0][1]['bas_ed_token']=('void',['unsigned','unsigned'])
-  GROUPS[2][1].update({'bas_editor':('void',['unsigned']),
+  GROUPS[2][1].update({'loop':('void',[]),'bas_command':('int',['char *']),
+   'bas_editor':('void',['unsigned']),
    'bas_ed_note':('void',['unsigned','unsigned','unsigned'])})
   GROUPS[4][1].update({n:('void',[]) for n in ('esave','eload')})
   GROUPS.append(('commands',{'bas_parse':('unsigned',['const char *']),'bas_renum':('unsigned',['unsigned']),
@@ -109,7 +111,8 @@ def main():
   # Input and bytecode emission use the same memory at different times.
   # Place the expression parser with the statements that call it.
   GROUPS.append(('bytecode-compile',{'ib_compile':('int',['void *','unsigned']),
-   'ib_declare_int':('void',['void *'])}))
+   'ib_declare_int':('void',['void *']),
+   'ib_compile_immediate':('int',['void *','unsigned','unsigned'])}))
   GROUPS.append(('bytecode-stmt',{n:('void',['void *']) for n in
    ('ib_lines','ib_stmt','ib_assign','ib_for_stmt','ib_next_stmt','ib_print_stmt','ib_dimension')}))
   GROUPS[-1][1].update({'ib_expr':('unsigned',['void *']), 'ib_expr_at':('unsigned',['void *','unsigned']),

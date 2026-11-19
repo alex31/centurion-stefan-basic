@@ -63,7 +63,7 @@ loadvar:
     jz stackerr
     clrb bh
     ldbb 1(x)
-    lda _bas_work
+    lda _ib_state
     aab
     ldb (b)
     inr x,2
@@ -75,7 +75,7 @@ push_value:
 storevar:
     cla
     ldab 1(x)
-    ldb _bas_work
+    ldb _ib_state
     aab
     xfr b,a
     dcr y,4
@@ -127,7 +127,7 @@ indexvar:
     jz stackerr
     cla
     ldab 1(x)
-    ldb _bas_work
+    ldb _ib_state
     aab
     ldb (b)
     cla
@@ -146,7 +146,7 @@ indexoff:
     jz stackerr
     cla
     ldab 1(x)
-    ldb _bas_work
+    ldb _ib_state
     aab
     ldb (b)
     cla
@@ -168,7 +168,7 @@ add_offset:
 putvar:
     cla
     ldab 1(x)
-    ldb _bas_work
+    ldb _ib_state
     aab
     ldb (b)
     cla
@@ -185,7 +185,7 @@ putvar:
 putconst:
     cla
     ldab 3(x)
-    ldb _bas_work
+    ldb _ib_state
     aab
     ldb (b)
     cla
@@ -205,7 +205,7 @@ copyvar:
     sta (-s)
     cla
     ldab 1(x)
-    ldb _bas_work
+    ldb _ib_state
     aab
     ldb (b)
     xfr b,z
@@ -245,7 +245,7 @@ copy_range:
 jvar:
     cla
     ldab 1(x)
-    ldb _bas_work
+    ldb _ib_state
     aab
     lda (b)
     ldb 2(x)
@@ -326,7 +326,7 @@ nextloop:
     jnz looperr
     clrb bh
     ldbb 1(x)
-    lda _bas_work
+    lda _ib_state
     aab
     stb (-s)            /* address of the control variable */
     lda (b)
