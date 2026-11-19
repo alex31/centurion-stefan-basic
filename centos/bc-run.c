@@ -504,8 +504,7 @@ int ib_execute(struct ib_program *program)
         case IB_TEXT:
             p = vm_word(ip + 1);
             n = base[p++];
-            while (n--)
-                outch((char)base[p++]);
+            outs((char *)base + p, n);
             if (er || stb_done) goto done;
             ip += 3;
             continue;

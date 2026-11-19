@@ -151,9 +151,7 @@ int ib_string_compare(const struct ib_string *left, const struct ib_string *righ
 
 void ib_string_print(const struct ib_string *value)
 {
-    const char *text = bytes(value);
-    unsigned length = value->length;
-    while (length--) outch(*text++);
+    outs((char *)bytes(value), value->length);
     release(value);
 }
 

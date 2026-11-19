@@ -23,6 +23,9 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
 - The CPU6 assembly dispatch loop keeps the instruction and value-stack
   pointers in registers. It combines common indexed operations and handles
   the arithmetic hot path before falling back to C for float32 and I/O.
+- The CENTOS console batches up to 80 characters in one write. Bytecode
+  `PRINT` passes strings to the terminal buffer by length. The terminal
+  tests check spaces across a full buffer and newlines inside a string.
 - On the microcoded CPU6, the 26-generation integer Life kernel went from
   59,110,987 to 18,707,661 microsteps in the development measurements, a
   68.35% reduction. Both runs used the same seed, rule and generation count.

@@ -82,7 +82,6 @@ void outch(char c) {
         } else ioer=1;
     } else bas_emit(c);
 }
-void outs(char *s,uint16_t n) { while(n--)outch(*s++); }
 #ifdef __SDCC
 int abs(int value) { return value<0?-value:value; }
 void *__memcpy(void *destination,const void *source,unsigned int count) {
@@ -137,10 +136,10 @@ uint16_t ins(char *buffer,uint16_t capacity) {
 }
 uint16_t consins(char *buffer,uint16_t capacity) { return ins(buffer,capacity); }
 
-/* Batch normal terminal output; the program is still token-only. One
-   WRITEN per chunk avoids hundreds of SVCs during each editor repaint. */
+/* Keep a full 80-column terminal line together for WRITEN. The extra
+   byte terminates the encoded field. */
 #ifdef __CPU6_OS6__
-static unsigned char terminal_output[65];
+static unsigned char terminal_output[81];
 static unsigned terminal_used;
 void os6_write_encoded(unsigned char *,unsigned);
 void bas_flush(void) {
@@ -153,9 +152,18 @@ void bas_flush(void) {
 void bas_emit(char c) {
     if(c=='\n'){bas_flush();putchar('\n');return;}
     terminal_output[terminal_used++]=(unsigned char)c|128;
-    if(terminal_used==64)bas_flush();
+    if(terminal_used==sizeof terminal_output-1)bas_flush();
 }
 #else
 void bas_flush(void) {}
 void bas_emit(char c) {putchar((unsigned char)c);}
 #endif
+
+void outs(char *text, uint16_t length)
+{
+    if (od) {
+        while (length--) bas_emit(*text++);
+    } else {
+        while (length--) outch(*text++);
+    }
+}
