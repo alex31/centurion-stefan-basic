@@ -27,6 +27,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   assert.match(output,/\nSQUARE 9,0 *\r?\n/,output);
   output=await command('PRINT "TRIG ";ABS(COS(1)-0.5403023)<.00001;",";ABS(TAN(1)-1.5574077)<.00001');
   assert.match(output,/\nTRIG -1,-1 *\r?\n/,output);
+  output=await command('K=RND(1):PRINT "RANDOM ";K>=0;",";K<=1;",";RND(0)');
+  assert.match(output,/\nRANDOM -1,-1,0 *\r?\n/,output);
   await command('A$="CPU"');
   await command('A$=A$+CHR$(54)');
   output=await command('PRINT "ALPHA ";LEFT$(A$,3);RIGHT$(A$,1);" ";LEN(A$);" ";VAL(STR$(3.5))');

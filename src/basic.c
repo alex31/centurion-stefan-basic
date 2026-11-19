@@ -4425,12 +4425,8 @@ void xmap() {
    for float systems, use glibc parameters https://en.wikipedia.org/wiki/Linear_congruential_generator
 */
 
-void xrnd() {
-  number_t r;
+number_t bas_random(number_t r) {
   mem_t base = randombase;
-
-  /* the argument of the RND() function */
-  r = pop();
 
   /* this is the microsoft mode, argument <0 resets the sequence, 0 always the same number, > 1 a number between 0 and 1 */
   if (randombase < 0) {
@@ -4460,17 +4456,20 @@ pushresult:
   /* the result is calculated with the right modulus */
 #ifndef HASFLOAT
   if (r >= 0)
-    push((unsigned long)rd * r / 0x10000 + base);
+    return (unsigned long)rd * r / 0x10000 + base;
   else
-    push((unsigned long)rd * r / 0x10000 + 1 - base);
+    return (unsigned long)rd * r / 0x10000 + 1 - base;
 #else
   if (r >= 0)
-    push(rd * r / 0x80000000 + base);
+    return rd * r / 0x80000000 + base;
   else
-    push(rd * r / 0x80000000 + 1 - base);
+    return rd * r / 0x80000000 + 1 - base;
 #endif
 }
 
+void xrnd() {
+  push(bas_random(pop()));
+}
 
 #ifndef HASFLOAT
 /*

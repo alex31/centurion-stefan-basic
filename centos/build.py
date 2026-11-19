@@ -38,7 +38,7 @@ GROUPS=[
  ('powers',{'__c6_exp':('float',['float']),'__c6_log':('float',['float']),
           '__c6_fscale':('uint32_t',['uint32_t','int']),'sb_pow':('float',['float','float'])}),
  ('state',{'sb_mod':('float',['float','float']),'__c6_fsqrt':('uint32_t',['uint32_t']),
-           'xrnd':('void',[]),
+           'xrnd':('void',[]),'bas_random':('float',['float']),
            'array':('void',['void *','char','float *']),
            'xnew':('void',[]),'resetbasicstate':('void',[]),'displaybanner':('void',[])})]
 # Audited immutable table byte images from lib/float32/{atan,exp,log,reduce,
@@ -143,6 +143,8 @@ def main():
    cold_math.update({'__c6_atan':('float',['float']),'__c6_exp':('float',['float']),
                      '__c6_fscale':('uint32_t',['uint32_t','int']),
                      'sb_pow':('float',['float','float'])})
+   for function_name in ('__c6_fsqrt','bas_random'):
+    vm_functions[function_name]=cold_math.pop(function_name)
   GROUPS.append(('bytecode-run',vm_functions))
   GROUPS.append(('display',{'writenumber2':('uint16_t',['char *','float']),
                            'tinydtostrf':('uint16_t',['float','int','char *']),
@@ -220,11 +222,9 @@ def main():
   user.append(assemble((HERE/'console.s').read_text(),'console'))
   if args.commands and not args.vm_c:
    user.append(assemble((HERE/'bc-integer.s').read_text(),'bc-integer'))
-   # A byte can always index this table. Padding costs two bytes per unused
-   # opcode in the run overlay and removes a range branch from every dispatch.
+   # The dispatcher checks that the byte is inside the handler table.
    count=len(re.findall(r'^IB_OP\(', (HERE/'bc-ops.def').read_text(), re.M))
    if not 0<count<=256:raise ValueError('bytecode opcode count exceeds byte encoding')
-   (work/'bc-invalid.inc').write_text('    .word syntaxerr\n'*(256-count))
    dispatch=work/'bc-dispatch.pre.s'
    run([tools/'sdcc-cpu6/bin/sdcpp','-P','-I'+str(HERE),'-I'+str(work),HERE/'bc-dispatch.S',dispatch])
    user.append(assemble(dispatch.read_text(),'bc-dispatch'))

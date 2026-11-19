@@ -1,7 +1,7 @@
 #include "bytecode.h"
 extern float sb_pow(float, float);
 extern float sb_mod(float, float);
-extern void xrnd(void);
+extern number_t bas_random(number_t);
 
 int ib_float(unsigned op, ib_value *a, ib_value *b)
 {
@@ -67,7 +67,7 @@ int ib_float(unsigned op, ib_value *a, ib_value *b)
     case IB_FATAN: a->real = atanf(left); break;
     case IB_FLOG: a->real = logf(left); break;
     case IB_FEXP: a->real = expf(left); break;
-    case IB_FRND: push(left); xrnd(); a->real = pop(); break;
+    case IB_FRND: a->real = bas_random(left); break;
     case IB_FNEG: a->real = -left; break;
     case IB_FSQR: a->real = sqrtf(left); break;
     case IB_FSIN: a->real = sinf(left); break;

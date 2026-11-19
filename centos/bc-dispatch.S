@@ -39,6 +39,11 @@ poll:
 fetch:
     ldbb (x)
     clrb bh
+    lda IB_COUNT
+    sub b,a
+    bnl valid_opcode
+    jmp syntaxerr
+valid_opcode:
     slr b
     lda handlers
     aab
@@ -48,7 +53,6 @@ handlers:
 #define IB_OP(name, handler) .word handler
 #include "bc-ops.def"
 #undef IB_OP
-#include "bc-invalid.inc"
 
 constant:
     xfr y,a
