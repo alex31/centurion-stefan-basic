@@ -258,10 +258,13 @@ void ib_for_stmt(struct ib_compile *c)
     ++c->loops;
 }
 
+/* FOR stores a scalar offset and a real-type flag; 255 is not a valid offset. */
+enum { WHILE_FRAME = 255 };
+
 void ib_next_stmt(struct ib_compile *c)
 {
     unsigned depth;
-    if (!c->loops) {
+    if (!c->loops || c->variable[c->loops - 1] == WHILE_FRAME) {
         c->error = IB_LOOP;
         return;
     }
@@ -333,6 +336,73 @@ void ib_restore_stmt(struct ib_compile *c)
     ib_emit(c, ordinal);
 }
 
+static void emit_condition(struct ib_compile *c, unsigned start, unsigned type, unsigned on_true)
+{
+    /* One bit each for less, equal and greater. The VM jumps when the
+       relation is absent from the mask. */
+    static const uint8_t masks[] = {2, 5, 1, 3, 4, 6};
+    unsigned mask = 0;
+    if (c->comparison) {
+        mask = masks[c->comparison - IB_IEQ];
+        if (on_true) mask ^= 7;
+    }
+    if (mask && c->out - start == 6 &&
+        mem[start] == IB_ILOAD && mem[start + 2] == IB_CONST) {
+        mem[start] = IB_JVAR;
+        mem[start + 2] = mem[start + 3];
+        mem[start + 3] = mem[start + 4];
+        mem[start + 4] = (mem_t)mask;
+        --c->out;
+    } else {
+        if (mask) --c->out;
+        ib_emit(c, mask ? IB_JCMP : on_true ? IB_JNZ : IB_JZERO);
+        ib_emit(c, mask ? mask : type);
+    }
+}
+
+void ib_while_stmt(struct ib_compile *c)
+{
+    unsigned start = c->out, depth = c->loops, type;
+    if (depth == FORDEPTH) {
+        c->error = IB_LOOP;
+        return;
+    }
+    type = ib_expr(c);
+    if (c->error) return;
+    if (type == IB_STRING) {
+        c->error = IB_TYPE;
+        return;
+    }
+    emit_condition(c, start, type, 0);
+    c->variable[depth] = WHILE_FRAME;
+    c->exit_patch[depth] = c->out;
+    /* Until WEND patches the exit operand, it holds the back-edge target. */
+    ib_word(c, start);
+    ++c->loops;
+}
+
+void ib_wend_stmt(struct ib_compile *c)
+{
+    unsigned patch, start;
+    if (!c->loops || c->variable[c->loops - 1] != WHILE_FRAME) {
+        c->error = IB_LOOP;
+        return;
+    }
+    patch = c->exit_patch[--c->loops];
+    start = IB_WORD(patch);
+    ib_emit(c, IB_JUMP);
+    ib_word(c, start);
+    if (!c->error)
+        IB_SET(patch, c->out);
+}
+
+static int valid_if_body(const struct ib_compile *c)
+{
+    token_t token = c->token;
+    return token != TIF && token != TFOR && token != TNEXT && token != TWHILE &&
+           token != TWEND && token != TDEFINT && token != TDIM && !end_statement(c);
+}
+
 void ib_stmt(struct ib_compile *c)
 {
     unsigned start, patch, type, v, line;
@@ -375,10 +445,7 @@ void ib_stmt(struct ib_compile *c)
         }
         break;
     case TIF: {
-        /* One bit each for less, equal and greater. The VM jumps when the
-           relation is absent from the mask. */
-        static const uint8_t masks[] = {2, 5, 1, 3, 4, 6};
-        unsigned numeric, direct, mask = 0;
+        unsigned numeric, direct;
         start = c->out;
         type = ib_expr(c);
         if (type == IB_STRING) {
@@ -392,24 +459,7 @@ void ib_stmt(struct ib_compile *c)
             line = literal(c, 65535);
         if (c->error) break;
         direct = numeric && (c->token == LINENUMBER || c->token == EOL);
-        if (c->comparison) {
-            mask = masks[c->comparison - IB_IEQ];
-            if (direct) mask ^= 7;
-        }
-        if (mask && c->out - start == 6 &&
-            mem[start] == IB_ILOAD && mem[start + 2] == IB_CONST) {
-            /* The mask immediately precedes the target for both forms. */
-            mem[start] = IB_JVAR;
-            mem[start + 2] = mem[start + 3];
-            mem[start + 3] = mem[start + 4];
-            mem[start + 4] = (mem_t)mask;
-            --c->out;
-        } else {
-            if (mask)
-                --c->out;
-            ib_emit(c, mask ? IB_JCMP : direct ? IB_JNZ : IB_JZERO);
-            ib_emit(c, mask ? mask : type);
-        }
+        emit_condition(c, start, type, direct);
         if (direct) {
             branch_target(c, line);
             break;
@@ -422,8 +472,7 @@ void ib_stmt(struct ib_compile *c)
         } else {
             /* A false IF skips the rest of its physical line. Avoid nested
                statement recursion here to bound the target C stack. */
-            if (c->token == TIF || c->token == TFOR || c->token == TNEXT ||
-                c->token == TDEFINT || c->token == TDIM || end_statement(c)) {
+            if (!valid_if_body(c)) {
                 c->error = IB_SYNTAX;
                 break;
             }
@@ -431,8 +480,7 @@ void ib_stmt(struct ib_compile *c)
         }
         while (!c->error && c->token == ':') {
             ib_take(c);
-            if (c->token == TIF || c->token == TFOR || c->token == TNEXT ||
-                c->token == TDEFINT || c->token == TDIM || end_statement(c)) {
+            if (!valid_if_body(c)) {
                 c->error = IB_SYNTAX;
                 break;
             }
@@ -444,6 +492,8 @@ void ib_stmt(struct ib_compile *c)
     }
     case TFOR: ib_for_stmt(c); break;
     case TNEXT: ib_next_stmt(c); break;
+    case TWHILE: ib_while_stmt(c); break;
+    case TWEND: ib_wend_stmt(c); break;
     case TRETURN: ib_emit(c, IB_RETURN); break;
     case TSTOP: case TEND: ib_emit(c, IB_END); break;
     default: c->error = IB_SYNTAX; break;

@@ -23,6 +23,10 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
   arrays, or to string variables. `RESTORE` rewinds to the beginning.
   `RESTORE n` selects the n-th value, starting at 1. The data cursor reads
   the stored tokens directly and reports type errors and end of data.
+- `WHILE` tests a condition before each iteration and `WEND` returns to
+  that test. Conditions can compare real numbers and strings. `WHILE`
+  and `FOR` share a nesting limit of eight loops in the compiler. A
+  `WHILE` loop compiles to branches and needs no runtime loop frame.
 - The REPL and line editor share a code overlay. The compiler and VM run
   from their own overlays while variables live in permanent RAM.
 - The CPU6 assembly dispatch loop keeps the instruction and value-stack

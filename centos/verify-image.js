@@ -81,6 +81,18 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   output=await command('.RUN');assert.ok(output.includes('SUM 55')&&output.includes('SQRT2 1.41421'),output);
   assert.match(output,/\nDATA -7,CPU6:VT100,OK,2\.5,-6\.25/,output);
   assert.match(output,/\nRESTORE CPU6:VT100,OK,2\.5/,output);
+  assert.match(output,/\nWHILE 2,\*{6}!/,output);
+  assert.doesNotMatch(output,/FAIL SKIPPED/);
+  output=await command('N=0:FOR I=1 TO 3:WHILE N<I:N=N+1:WEND:NEXT I:PRINT "NEST ";N');
+  assert.match(output,/\nNEST 3 /,output);
+  output=await command('I=0:WHILE I<3:I=I+1:WEND:PRINT "INTEGER ";I');
+  assert.match(output,/\nINTEGER 3 /,output);
+  for(const bad of ['WEND','WHILE 1','WHILE 1:FOR I=1 TO 1:WEND:NEXT I',
+                    'FOR I=1 TO 1:WHILE 1:NEXT I:WEND',
+                    'WHILE 0:'.repeat(9)+'WEND:'.repeat(8)+'WEND']){
+   output=await command(bad);assert.match(output,/Unmatched FOR\/NEXT, WHILE\/WEND/,output);
+  }
+  checks.push('WHILE and WEND test real and string expressions and enforce loop nesting');
   await command('RESTORE 2');
   output=await command('READ I');assert.match(output,/Invalid type/,output);
   await command('READ A$');
@@ -107,6 +119,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   output=await command('.RUN');assert.ok(output.includes('SUM 55'),output);
   assert.match(output,/\nDATA -7,CPU6:VT100,OK,2\.5,-6\.25/,output);
   assert.match(output,/\nRESTORE CPU6:VT100,OK,2\.5/,output);
+  assert.match(output,/\nWHILE 2,\*{6}!/,output);
   checks.push('sample runs, saves as native BDEMO and reloads');
   await command('.BYE','FOR SYSRDR');await sleep(400);await command('.STA','STATUS DISPLAY');
   await command('.RUN '+process.env.BASIC_PROGRAM);

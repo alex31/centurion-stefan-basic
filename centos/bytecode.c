@@ -3,7 +3,7 @@
 static const char *const ib_errors[] = {
     "", "Unsupported statement or syntax", "BASIC memory exhausted",
     "Invalid type or undeclared array", "Number, array index or string length out of range",
-    "Unknown branch line", "Unmatched FOR/NEXT or RETURN", "Bytecode stack limit",
+    "Unknown branch line", "Unmatched FOR/NEXT, WHILE/WEND or RETURN", "Bytecode stack limit",
     "Division by zero", "Out of DATA"
 };
 

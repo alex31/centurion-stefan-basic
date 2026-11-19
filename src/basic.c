@@ -227,9 +227,11 @@ const char severy[]     PROGMEM  = "EVERY";
 #ifdef HASEVENTS
 const char sevent[]     PROGMEM  = "EVENT";
 #endif
-#ifdef HASSTRUCT
+#if defined(HASSTRUCT) || defined(STBASIC_COMMANDS)
 const char swhile[]		PROGMEM	= "WHILE";
 const char swend[]      PROGMEM = "WEND";
+#endif
+#ifdef HASSTRUCT
 const char srepeat[]	PROGMEM	= "REPEAT";
 const char suntil[]     PROGMEM	= "UNTIL";
 const char sswitch[]	PROGMEM	= "SWITCH";
@@ -354,8 +356,11 @@ const char* const keyword[] PROGMEM = {
 #ifdef HASEVENTS
   sevent,
 #endif
+#if defined(HASSTRUCT) || defined(STBASIC_COMMANDS)
+  swhile, swend,
+#endif
 #ifdef HASSTRUCT
-  swhile, swend, srepeat, suntil, sswitch, scase, sswend,
+  srepeat, suntil, sswitch, scase, sswend,
   sdo, sdend,
 #endif
 #ifdef HASDARTMOUTH
@@ -456,8 +461,11 @@ const token_t tokens[] PROGMEM = {
 #ifdef HASEVENTS
   TEVENT,
 #endif
+#if defined(HASSTRUCT) || defined(STBASIC_COMMANDS)
+  TWHILE, TWEND,
+#endif
 #ifdef HASSTRUCT
-  TWHILE, TWEND, TREPEAT, TUNTIL, TSWITCH, TCASE, TSWEND,
+  TREPEAT, TUNTIL, TSWITCH, TCASE, TSWEND,
   TDO, TDEND,
 #endif
 #ifdef HASDARTMOUTH

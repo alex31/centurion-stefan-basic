@@ -112,9 +112,10 @@ def main():
   # Place the expression parser with the statements that call it.
   GROUPS.append(('bytecode-compile',{'ib_compile':('int',['void *','unsigned']),
    'ib_declare_int':('void',['void *']),
-   # READ/RESTORE statement compilation is infrequent. Keep their bodies in
-   # the small compiler overlay; DATA validation stays with the source walk.
+   # Keep less common statement bodies in the small compiler overlay.
+   # DATA validation stays with the source walk.
    'ib_read_stmt':('void',['void *']), 'ib_restore_stmt':('void',['void *']),
+   'ib_while_stmt':('void',['void *']), 'ib_wend_stmt':('void',['void *']),
    'ib_compile_immediate':('int',['void *','unsigned','unsigned'])}))
   GROUPS.append(('bytecode-stmt',{n:('void',['void *']) for n in
    ('ib_lines','ib_stmt','ib_assign','ib_for_stmt','ib_next_stmt','ib_print_stmt','ib_dimension')}))
