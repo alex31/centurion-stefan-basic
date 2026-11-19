@@ -43,7 +43,7 @@ def build(argv,args):
         # Keep console, file and loader support at their speed profile.
         private=output.parent/'runtime-size/lib'
         names=['os6/libos6.a','os6/libprintf-sdcc.a','os6/liboverlay-sdcc.a',
-               'os6/putchar.o','os6/puts.o','cpu6/libcompiler-sdcc.a','ee200/libee200.a']
+               'os6/putchar.o','os6/puts.o','cpu6/libcompiler-sdcc.a']
         for name in names:
             source=libraries/name;target=private/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,target)
             provenance=source.with_suffix(source.suffix+'.build.json')

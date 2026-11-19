@@ -135,7 +135,7 @@ def main():
                            'debugtoken':('void',[]), 'xlist':('void',[])}))
  tools=ROOT/'build/out/toolchain';libs=args.lib_root.resolve();sdk=HERE/'mmu-runtime'
  libraries=[libs/'os6/libprintf-sdcc.a',libs/'os6/liboverlay-sdcc.a',libs/'os6/libos6.a',
-            libs/'cpu6/libfloat32-sdcc.a',libs/'cpu6/libcompiler-sdcc.a',libs/'ee200/libee200.a']
+            libs/'cpu6/libfloat32-sdcc.a',libs/'cpu6/libcompiler-sdcc.a']
  inputs=[*sources,*sorted(HERE.glob('*.h')),*sorted((ROOT/'os6/include').glob('*.h')),*sorted((ROOT/'swext/stefan-basic/src').glob('*.h')),*[sdk/n for n in ['runtime.c','gate.s','module-start.s']],
          ROOT/'os6/crt0.s',ROOT/'os6/file.c',ROOT/'os6/include/os6file.h',HERE/'clock.s',HERE/'console.s',Path(__file__),ROOT/'scripts/cpu6_lto.py',tools/'sdcc-cpu6/bin/sdcc',*libraries]
  if args.commands:inputs.append(HERE/'bc-ops.def')

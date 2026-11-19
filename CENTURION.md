@@ -44,7 +44,8 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
   This is a kernel measurement on an emulator.
 
 Run `make basic` from the distribution root to produce the executable,
-mapped module and overlays. Run `make basic-image SEED=/path/to/CENTOS_13.IMG`
+mapped module and overlays with the SDK's native compiler runtime. Run
+`make basic-image SEED=/path/to/CENTOS_13.IMG`
 to install and boot-test BASIC on a new disk copy. Use `STARTBASIC` at the
 CENTOS prompt.
 
