@@ -8,6 +8,7 @@ group arguments refer only to resident data or the C stack, never cold constants
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import runpy
@@ -148,7 +149,7 @@ def main():
  if args.commands:flags.append('-DSTBASIC_COMMANDS')
  if args.no_auto_inline:flags.append('--cpu6-no-auto-inline')
  if args.commands and not args.vm_c:flags.append('-DSTBASIC_VM_ASM')
- work=Path(tempfile.mkdtemp(prefix='basic-images-',dir=ROOT/'build/out'))
+ work=Path(tempfile.mkdtemp(prefix='basic-images-',dir=os.environ.get('CENTURION_IMAGE_WORK', ROOT/'build/out')))
  commands=[]
  print('Results:',work,flush=True)
  def run(command,logname=None):

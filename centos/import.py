@@ -20,7 +20,7 @@ for number,line in enumerate(text.splitlines(),1):
  if len(line)>125:p.error('source line %d exceeds125 characters'%number)
  lines.append(line)
 if not lines:p.error('source has no numbered lines')
-work=Path(tempfile.mkdtemp(prefix='basic-import-',dir=ROOT/'build/out'));print('Results:',work,flush=True)
+work=Path(tempfile.mkdtemp(prefix='basic-import-',dir=os.environ.get('CENTURION_IMAGE_WORK', ROOT/'build/out')));print('Results:',work,flush=True)
 (work/'lines.json').write_text(json.dumps(lines));original=hashlib.sha256(seed.read_bytes()).hexdigest()
 qa=work/'import.js'
 qa.write_text(r'''const fs=require('node:fs'),assert=require('node:assert/strict');

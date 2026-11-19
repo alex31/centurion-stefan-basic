@@ -9,7 +9,7 @@ from centos_text import encode
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('directory',type=Path,help='directory containing the built BASIC.json and components')
 p.add_argument('-o',required=True,type=Path,help='new output image; never overwrite an existing disk')
-p.add_argument('--seed',type=Path,default=ROOT/'build/out/CENTOS_13.IMG')
+p.add_argument('--seed',type=Path,default=ROOT/'build/out/image/CENTOS_13.IMG')
 p.add_argument('--slots',type=int,default=16,help='preallocated native program files (including BDEMO)')
 p.add_argument('--check-games',action='store_true',help='also verify XCHESS and XCONNECT4 from the seed image')
 a=p.parse_args();directory=a.directory.resolve();seed=a.seed.resolve(strict=True);output=a.o.resolve()
@@ -18,7 +18,7 @@ if output.exists() or output==seed:p.error('output must be a new distinct image'
 d=json.loads((directory/'BASIC.json').read_text())
 if d.get('format')!='cpu6-stefan-mmu-overlays' or not {'files','directory','commands'}<={g['label'] for g in d['overlays']}:
  p.error('build the interactive application with --commands first')
-work=Path(tempfile.mkdtemp(prefix='basic-install-',dir=ROOT/'build/out'));print('Results:',work,flush=True)
+work=Path(tempfile.mkdtemp(prefix='basic-install-',dir=os.environ.get('CENTURION_IMAGE_WORK', ROOT/'build/out')));print('Results:',work,flush=True)
 original=hashlib.sha256(seed.read_bytes()).hexdigest()
 job='.JOB STARTBASIC ABORT=CANCEL\n.LOAD BASIC '+d['moduleName']+'\n.RUN '+d['program']+'\n.END\nS.CON\n'
 (work/'STARTBASIC.jcl').write_text(job)
