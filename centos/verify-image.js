@@ -23,6 +23,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   assert.ok(output.includes('CHECK 0 1 2 1024'),output);
   output=await command('PRINT "REAL ";300*300;" ";ABS(EXP(LOG(3.5))-3.5)<.0001;" ";2^3^2');
   assert.ok(output.includes('REAL 90000 -1 512'),output);
+  output=await command('PRINT "SQUARE ";(-3)^2;",";0^2');
+  assert.match(output,/\nSQUARE 9,0 *\r?\n/,output);
   await command('A$="CPU"');
   await command('A$=A$+CHR$(54)');
   output=await command('PRINT "ALPHA ";LEFT$(A$,3);RIGHT$(A$,1);" ";LEN(A$);" ";VAL(STR$(3.5))');

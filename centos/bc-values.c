@@ -50,7 +50,16 @@ int ib_float(unsigned op, ib_value *a, ib_value *b)
             return IB_DIVZERO;
         a->real = left / right;
         break;
-    case IB_FPOW: a->real = sb_pow(left, right); break;
+    case IB_FPOW:
+#ifdef __CPU6_OS6__
+        /* A finite square uses the same binary32 product as sb_pow. */
+        if (b->bits == 0x40000000UL && (a->bits & 0x7f800000UL) != 0x7f800000UL) {
+            a->real = left * left;
+            break;
+        }
+#endif
+        a->real = sb_pow(left, right);
+        break;
     case IB_FMOD: a->real = sb_mod(left, right); break;
     case IB_FABS: a->real = fabsf(left); break;
     case IB_FINT: a->real = floorf(left); break;
