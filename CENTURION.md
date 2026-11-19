@@ -29,6 +29,10 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
   `WHILE` loop compiles to branches and needs no runtime loop frame.
 - The REPL and line editor share a code overlay. The compiler and VM run
   from their own overlays while variables live in permanent RAM.
+- The VM overlay includes real arithmetic and conversions. Real FOR
+  loops with exact whole-number values and a unit increment can advance
+  their binary32 representation directly. Other steps and fractional or
+  out-of-range values use the full floating-point operations.
 - The CPU6 assembly dispatch loop keeps the instruction and value-stack
   pointers in registers. It combines common indexed operations and handles
   the arithmetic hot path before falling back to C for float32 and I/O.

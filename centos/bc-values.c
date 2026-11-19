@@ -56,6 +56,27 @@ int ib_float(unsigned op, ib_value *a, ib_value *b)
 
 int ib_for_real(struct ib_loop *loop, ib_value *variable, unsigned advance)
 {
+#ifdef __CPU6_OS6__
+    if (advance && loop->step.bits == 0x3f800000UL && loop->limit.bits <= 0x7f800000UL) {
+        static const uint32_t units[] = {
+            0x800000UL, 0x400000UL, 0x200000UL, 0x100000UL, 0x80000UL, 0x40000UL,
+            0x20000UL, 0x10000UL, 0x8000UL, 0x4000UL, 0x2000UL, 0x1000UL,
+            0x800UL, 0x400UL, 0x200UL, 0x100UL, 0x80UL, 0x40UL,
+            0x20UL, 0x10UL, 8UL, 4UL, 2UL, 1UL,
+        };
+        uint32_t bits = variable->bits;
+        unsigned exponent = (unsigned)(bits >> 23) - 127;
+        if (exponent < sizeof units / sizeof units[0]) {
+            uint32_t unit = units[exponent];
+            /* For whole binary32 values from 1 up to 2^24-1, adding one
+               encoded unit is exact, including a carry to the next exponent. */
+            if (!(bits & (unit - 1))) {
+                variable->bits = bits + unit;
+                return variable->bits <= loop->limit.bits;
+            }
+        }
+    }
+#endif
     number_t step = loop->step.real, value = variable->real, updated;
     if (!step)
         return -1;

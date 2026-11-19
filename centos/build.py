@@ -121,13 +121,15 @@ def main():
    ('ib_lines','ib_stmt','ib_assign','ib_for_stmt','ib_next_stmt','ib_print_stmt','ib_dimension')}))
   GROUPS[-1][1].update({'ib_expr':('unsigned',['void *']), 'ib_expr_at':('unsigned',['void *','unsigned']),
    'ib_primary':('unsigned',['void *']), 'ib_coerce':('void',['void *','unsigned','unsigned'])})
-  vm_functions={'ib_execute':('int',['void *']), 'ib_for_real':('int',['void *','void *','unsigned'])}
+  # The VM and its numeric operations share an overlay. A floating-point
+  # opcode can call its implementation without replacing the running VM.
+  vm_functions={'ib_execute':('int',['void *']), 'ib_for_real':('int',['void *','void *','unsigned']),
+                'ib_float':('int',['unsigned','void *','void *']),
+                'ib_input':('int',['unsigned','void *'])}
   if not args.vm_c:
    vm_functions.update({n:('int',['void *','int']) for n in ('ib_add16','ib_mul16')})
    vm_functions['ib_dispatch']=('int',['void *'])
   GROUPS.append(('bytecode-run',vm_functions))
-  GROUPS.append(('bytecode-values',{'ib_float':('int',['unsigned','void *','void *']),
-   'ib_input':('int',['unsigned','void *'])}))
   GROUPS.append(('display',{'writenumber2':('uint16_t',['char *','float']),
                            'tinydtostrf':('uint16_t',['float','int','char *']),
                            'writenumber':('uint16_t',['char *','int32_t']),

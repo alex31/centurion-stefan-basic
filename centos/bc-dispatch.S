@@ -314,8 +314,6 @@ set_ip:
 /* The next-free loop pointer lives in cursor.loops. The packed frame
    immediately before it holds limit, step, start and the tagged variable. */
 nextloop:
-    ldab 1(x)
-    jlt slow            /* float STEP uses the shared C implementation */
     lda 10(s)
     ldb 4(a)
     lda (_ib_loops)
@@ -328,6 +326,7 @@ nextloop:
     jnz looperr
     clrb bh
     ldbb 1(x)
+    bm next_real
     lda _ib_state
     aab
     stb (-s)            /* address of the control variable */
@@ -369,6 +368,24 @@ next_again:
     ldb (s)
     ldb -3(b)
     bra set_ip
+
+next_real:
+    ldab 127
+    andb al,bl
+    lda _ib_state
+    aab
+    lda 1
+    sta (-s)            /* advance */
+    stb (-s)            /* variable */
+    ldb 4(s)
+    dcr b,11
+    stb (-s)            /* loop */
+    jsr _ib_for_real
+    inr s,6
+    ori b,b
+    jlt rangeerr
+    bnz next_again
+    bra next_done
 
 slow:
     clrb bh

@@ -93,6 +93,20 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    output=await command(bad);assert.match(output,/Unmatched FOR\/NEXT, WHILE\/WEND/,output);
   }
   checks.push('WHILE and WEND test real and string expressions and enforce loop nesting');
+  for(const [loop,final] of [
+   ['FOR K=127 TO 129:NEXT K',130],
+   ['FOR K=16777214 TO 16777215:NEXT K',16777216],
+   ['FOR K=1 TO 3:K=2.5:NEXT K',3.5],
+   ['FOR K=1 TO 2 STEP 0.5:NEXT K',2.5],
+   ['FOR K=3 TO 1 STEP -1:NEXT K',0],
+  ]) {
+   output=await command(loop+':PRINT "LIMIT ";K='+final);
+   assert.match(output,/\nLIMIT -1 *\r?\n/,output);
+  }
+  for(const loop of ['FOR K=1 TO 3 STEP 0:NEXT K','FOR K=16777216 TO 16777218:NEXT K']){
+   output=await command(loop);assert.match(output,/out of range/,output);
+  }
+  checks.push('real FOR preserves exponent transitions, fractional and negative steps and range errors');
   await command('RESTORE 2');
   output=await command('READ I');assert.match(output,/Invalid type/,output);
   await command('READ A$');

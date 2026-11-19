@@ -15,7 +15,7 @@ enum ib_op {
 
 #define IB_STRING_VARIABLES 26
 struct ib_string { uint16_t location, length; };
-typedef union { int16_t integer; number_t real; struct ib_string string; } ib_value;
+typedef union { int16_t integer; number_t real; uint32_t bits; struct ib_string string; } ib_value;
 #define IB_SCALAR_OFFSET(v) ((v) * sizeof(ib_value))
 struct ib_loop {
     ib_value limit, step;
