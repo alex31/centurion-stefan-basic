@@ -40,6 +40,11 @@
  */
 #include "language.h"
 #include "basic.h"
+#ifdef STBASIC_COMMANDS
+extern unsigned char bas_ed_preserve;
+void bas_ed_token(unsigned,unsigned);
+void bas_ed_note(unsigned,unsigned,unsigned);
+#endif
 
 /* use long jump for error handling */
 #if USELONGJUMP == 1
@@ -75,6 +80,13 @@ const char sabs[]    PROGMEM = "ABS";
 const char srnd[]    PROGMEM = "RND";
 const char ssize[]   PROGMEM = "SIZE";
 const char srem[]    PROGMEM = "REM";
+#ifdef STBASIC_COMMANDS
+const char sdefint[] PROGMEM = "DEFINT";
+const char smod[] PROGMEM = "MOD";
+#ifndef HASAPPLE1
+const char sdim[] PROGMEM = "DIM";
+#endif
+#endif
 /* Apple 1 language set */
 #ifdef HASAPPLE1
 const char snot[]    PROGMEM = "NOT";
@@ -90,6 +102,18 @@ const char stab[]    PROGMEM = "TAB";
 const char sthen[]   PROGMEM = "THEN";
 const char sbend[]   PROGMEM = "END";
 const char spoke[]   PROGMEM = "POKE";
+#endif
+#if defined(HASCONSOLESCALARS) && !defined(HASAPPLE1)
+const char snot[] PROGMEM = "NOT";
+const char sand[] PROGMEM = "AND";
+const char sor[] PROGMEM = "OR";
+const char ssgn[] PROGMEM = "SGN";
+const char sthen[] PROGMEM = "THEN";
+const char sbend[] PROGMEM = "END";
+#endif
+#if defined(HASCONSOLESCALARS) && !defined(HASSTEFANSEXT)
+const char ssqr[] PROGMEM = "SQR";
+const char spow[] PROGMEM = "POW";
 #endif
 /* Stefan's basic additions */
 #ifdef HASSTEFANSEXT
@@ -246,6 +270,12 @@ const char* const keyword[] PROGMEM = {
   sgoto, sgosub, sreturn, sif, sfor, sto,
   sstep, snext, sstop, slist, snew, srun,
   sabs, srnd, ssize, srem,
+#ifdef STBASIC_COMMANDS
+  sdefint, smod,
+#ifndef HASAPPLE1
+  sdim,
+#endif
+#endif
 #ifdef HASAPPLE1
   snot, sand, sor, slen, ssgn, speek, sdim,
   sclr, shimem, stab, sthen,
@@ -253,6 +283,12 @@ const char* const keyword[] PROGMEM = {
 #endif
 #ifdef HASSTEFANSEXT
   scont, ssqr, spow, smap, sdump, sbreak,
+#endif
+#if defined(HASCONSOLESCALARS) && !defined(HASAPPLE1)
+  snot, sand, sor, ssgn, sthen, sbend,
+#endif
+#if defined(HASCONSOLESCALARS) && !defined(HASSTEFANSEXT)
+  ssqr, spow,
 #endif
   ssave, sload,
 #ifdef HASSTEFANSEXT
@@ -332,12 +368,24 @@ const token_t tokens[] PROGMEM = {
   GREATEREQUAL, LESSEREQUAL, NOTEQUAL, TPRINT, TLET,
   TINPUT, TGOTO, TGOSUB, TRETURN, TIF, TFOR, TTO, TSTEP,
   TNEXT, TSTOP, TLIST, TNEW, TRUN, TABS, TRND, TSIZE, TREM,
+#ifdef STBASIC_COMMANDS
+  TDEFINT, TMOD,
+#ifndef HASAPPLE1
+  TDIM,
+#endif
+#endif
 #ifdef HASAPPLE1
   TNOT, TAND, TOR, TLEN, TSGN, TPEEK, TDIM, TCLR,
   THIMEM, TTAB, TTHEN, TEND, TPOKE,
 #endif
 #ifdef HASSTEFANSEXT
   TCONT, TSQR, TPOW, TMAP, TDUMP, TBREAK,
+#endif
+#if defined(HASCONSOLESCALARS) && !defined(HASAPPLE1)
+  TNOT, TAND, TOR, TSGN, TTHEN, TEND,
+#endif
+#if defined(HASCONSOLESCALARS) && !defined(HASSTEFANSEXT)
+  TSQR, TPOW,
 #endif
   TSAVE, TLOAD,
 #ifdef HASSTEFANSEXT
@@ -633,7 +681,7 @@ mem_t args;
 #ifndef HASFLOAT
 address_t rd;
 #else
-unsigned long rd;
+uint32_t rd;
 #endif
 
 /* the RUN debuglevel */
@@ -802,7 +850,7 @@ address_t ballocmem() {
 #else
 address_t ballocmem() {
   return MEMSIZE - 1;
-};
+}
 #endif
 
 /*
@@ -1229,7 +1277,7 @@ number_t getvar(name_t *name) {
 
 #else
   /* we only have the static variable array */
-  if (name->c[0] >= 65 && name->c[0] <= 91 && name->c[1] == 0) return vars[name->c[0] - 65];
+  if (name->c[0] >= 65 && name->c[0] <= 90 && name->c[1] == 0) return vars[name->c[0] - 65];
 
   /* systems without Apple1 extension i.e. HEAP throw an error */
   error(EVARIABLE);
@@ -1318,7 +1366,7 @@ void setvar(name_t *name, number_t v) {
   setnumber(a, memwrite2, v);
 #else
   /* the static variable array */
-  if (name->c[1] == 0 && name->c[0] >= 65 && name->c[0] <= 91) {
+  if (name->c[1] == 0 && name->c[0] >= 65 && name->c[0] <= 90) {
     vars[name->c[0] - 65] = v;
     return;
   }
@@ -1505,27 +1553,27 @@ void outname(name_t* name) {
 #else
 /* this one is for the heap were we count down writing*/
 address_t setname_heap(address_t m, name_t* name) {
-  mem_t l;
-  for (l = name->l; l > 0; l--) memwrite2(m--, name->c[l - 1]);
+  mem_t name_index;
+  for (name_index = name->l; name_index > 0; name_index--) memwrite2(m--, name->c[name_index - 1]);
   memwrite2(m--, name->l);
   return m;
 }
 
 /* this one is for the pgm were we count up writing */
 address_t setname_pgm(address_t m, name_t* name) {
-  mem_t l;
+  mem_t name_index;
   memwrite2(m++, name->l);
-  for (l = 0; l < name->l; l++) memwrite2(m++, name->c[l]);
+  for (name_index = 0; name_index < name->l; name_index++) memwrite2(m++, name->c[name_index]);
   return m;
 }
 
 /* get a name from a memory location */
 address_t getname(address_t m, name_t* name, memreader_t f) {
-  mem_t l;
+  mem_t name_index;
   name->l = f(m++);
 
-  for (l = 0; l < name->l; l++) name->c[l] = f(m++);
-  // for(; l<MAXNAME; l++) name->c[l]=0; /* should not be there, is needed for */
+  for (name_index = 0; name_index < name->l; name_index++) name->c[name_index] = f(m++);
+  // for(; name_index<MAXNAME; name_index++) name->c[name_index]=0; /* should not be there, is needed for */
   /*	not having this here causes the obscure function namehandling bug if xfn does not do a zeroname
   	have not yet found the root cause for this */
   return m;
@@ -1533,26 +1581,26 @@ address_t getname(address_t m, name_t* name, memreader_t f) {
 
 /* compare two names */
 mem_t cmpname(name_t* a, name_t* b) {
-  mem_t l;
+  mem_t name_index;
   if (a->l != b->l) return 0;
-  for (l = 0; l < a->l; l++) if (a->c[l] != b->c[l]) return 0;
+  for (name_index = 0; name_index < a->l; name_index++) if (a->c[name_index] != b->c[name_index]) return 0;
   return 1;
 }
 
 /* copy the entire name stucture */
 void copyname(name_t* a, name_t* b) {
-  mem_t l;
+  mem_t name_index;
   a->l = b->l;
-  for (l = 0; l < b->l; l++) a->c[l] = b->c[l];
+  for (name_index = 0; name_index < b->l; name_index++) a->c[name_index] = b->c[name_index];
   a->token = b->token;
   if (a->l == 1) a->c[1] = 0; /* this is needed for compatibility with the short name code when handling special vars */
 }
 
 /* zero a name and a heap object */
 void zeroname(name_t* name) {
-  mem_t l;
+  mem_t name_index;
   name->l = 0;
-  for (l = 0; l < MAXNAME; l++) name->c[l] = 0;
+  for (name_index = 0; name_index < MAXNAME; name_index++) name->c[name_index] = 0;
   name->token = 0;
 }
 
@@ -1564,8 +1612,8 @@ void zeroheap(heap_t* heap) {
 
 /* output a name */
 void outname(name_t* name) {
-  mem_t l;
-  for (l = 0; l < name->l; l++) outch(name->c[l]);
+  mem_t name_index;
+  for (name_index = 0; name_index < name->l; name_index++) outch(name->c[name_index]);
 }
 #endif
 
@@ -1681,7 +1729,8 @@ void array(lhsobject_t* object, mem_t getset, number_t* value) {
         return;
 #endif
       case 0:
-        h = (himem - top) / numsize;
+        h = (himem - top + 1) / numsize;
+        if (object->i >= h) { error(EORANGE); return; }
         a = himem - numsize * (object->i + 1) + 1;
         if (a < top) {
           error(EORANGE);
@@ -1702,6 +1751,7 @@ void array(lhsobject_t* object, mem_t getset, number_t* value) {
         else if (getset == 's') memwrite2(a, *value);
         return;
 #endif
+#ifndef STEFAN_CENTOS
       case 'P':
         /* the io ports */
         if (object->i < 16) {
@@ -1722,6 +1772,7 @@ void array(lhsobject_t* object, mem_t getset, number_t* value) {
         }
         error(EORANGE);
         return;
+#endif
       default:
         error(EVARIABLE);
         return;
@@ -2318,6 +2369,8 @@ void error(token_t e) {
 }
 
 void reseterror() {
+  lexliteral = 0;
+  clearst();
   er = 0;
   here = 0;
   st = SINT;
@@ -2383,7 +2436,7 @@ void push(number_t t) {
 
   /* in forced integer mode every operation is truncated */
 #ifdef HASFLOAT
-  if (forceint) t = trunc(t);
+  if (forceint) t = truncf(t);
 #endif
 
   if (sp == STACKSIZE)
@@ -2469,7 +2522,7 @@ address_t popaddress() {
   number_t tmp = 0;
 
   tmp = pop();
-  if (tmp < 0) {
+  if (!(tmp >= 0 && tmp <= (number_t)maxaddr)) {
     error(EORANGE);
     return 0;
   }
@@ -2786,51 +2839,51 @@ address_t parsenumbern(char *c, number_t *r) {
 
 
 #ifdef HASFLOAT
-/* a poor man's atof implementation with character count */
+/* Bounded decimal scanner. Keep at most nine significant digits, then
+   compensate with a decimal exponent. In particular, E+ is a sign, not an
+   expression operator; huge exponents must not cause an unbounded loop.
+   The token representation remains the original native float32 value. */
 address_t parsenumber2(char *c, number_t *r) {
-  address_t nd = 0;
-  index_t i;
-  number_t fraction = 0;
-  number_t exponent = 0;
-  mem_t nexp = 0;
-
-  *r = 0;
-
-  /* integer part */
-  i = parsenumber(c, r);
-  c += i;
-  nd += i;
-
-  /* the fractional part */
-  if (*c == '.') {
+#ifdef STEFAN_CENTOS
+  extern unsigned bas_atof(const char *,float *);
+  return (address_t)bas_atof(c,r);
+#else
+  char *start = c, *mark;
+  int scale = 0, exponent = 0;
+  unsigned digits = 0, fraction = 0, negative = 0;
+  number_t value = 0;
+  while ((*c >= '0' && *c <= '9') || (*c == '.' && !fraction)) {
+    if (*c == '.') { fraction = 1; c++; continue; }
+    if (digits || *c != '0') {
+      if (digits < 9) { value = value * 10 + (*c - '0'); digits++; }
+      else scale++;
+    }
+    if (fraction) scale--;
     c++;
-    nd++;
-
-    i = parsenumber(c, &fraction);
-    c += i;
-    nd += i;
-
-    if (i > 0) {
-      while ((--i) >= 0) fraction = fraction / 10;
-      *r += fraction;
+  }
+  if (*c == 'E' || *c == 'e') {
+    mark = c++;
+    if (*c == '-' || *c == '+') { negative = *c == '-'; c++; }
+    if (*c < '0' || *c > '9') c = mark;
+    else {
+      while (*c >= '0' && *c <= '9') {
+        if (exponent < 1000) exponent = exponent * 10 + (*c - '0');
+        c++;
+      }
+      scale += negative ? -exponent : exponent;
     }
   }
-
-  /* the exponent */
-  if (*c == 'E' || *c == 'e') {
-    c++;
-    nd++;
-    if (*c == '-') {
-      c++;
-      nd++;
-      nexp = 1;
-    };
-    i = parsenumber(c, &exponent);
-    nd += i;
-      while ((--exponent) >= 0) if (nexp) *r = *r / 10; else *r = *r * 10;
+  if (value != 0) {
+    if (scale > 50) value = INFINITY;
+    else if (scale < -60) value = 0;
+    else {
+      while (scale > 0) { value *= 10; scale--; }
+      while (scale < 0) { value /= 10; scale++; }
+    }
   }
-
-  return nd;
+  *r = value;
+  return (address_t)(c - start);
+#endif
 }
 #endif
 
@@ -2931,28 +2984,28 @@ address_t tinydtostrf(number_t v, index_t p, char* c) {
 
   /* if we are in forced integer mode */
   if (forceint) {
-    v = trunc(v);
-    return writenumber(c, (int)v);
+    v = truncf(v);
+    return writenumber(c, (wnumber_t)v);
   }
 
   /* we do the sign here */
   if (v < 0) {
-    v = fabs(v);
+    v = fabsf(v);
     c[nd++] = '-';
   }
 
   /* write the integer part */
-  nd += writenumber(c + nd, (int)v);
+  nd += writenumber(c + nd, (wnumber_t)v);
   c[nd++] = '.';
 
   /* only the fraction to precision p */
-  f = fabs(v);
+  f = fabsf(v);
 
   /* get p digits of the fraction */
   for (i = p; i > 0; i--) {
-    f = f - floor(f);
+    f = f - floorf(f);
     f = f * 10;
-    c[nd++] = (int)floor(f) + '0';
+    c[nd++] = (int)floorf(f) + '0';
   }
 
   /* and a terminating 0 */
@@ -2970,8 +3023,8 @@ address_t writenumber2(char *c, number_t vi) {
 
   /* pseudo integers are displayed as integer
   		zero trapped here */
-  f = floor(vi);
-  if (f == vi && fabs(vi) < maxnum) return writenumber(c, vi);
+  f = floorf(vi);
+  if (f == vi && fabsf(vi) < maxnum) return writenumber(c, vi);
 
   /* earlier, floats where displayed in POSIx using the libraties
      return sprintf(c, "%g", vi);
@@ -2987,11 +3040,11 @@ address_t writenumber2(char *c, number_t vi) {
 
   /* normalize the number and see which exponent we have to deal with */
   f = vi;
-  while (fabs(f) < 1.0)   {
+  while (fabsf(f) < 1.0f)   {
     f = f * 10;
     exponent--;
   }
-  while (fabs(f) >= 10.0 - 0.00001) {
+  while (fabsf(f) >= 10.0f - 0.00001f) {
     f = f / 10;
     exponent++;
   }
@@ -3188,16 +3241,13 @@ char btoupper(char c) {
   if (c >= 'a' && c <= 'z') return c - 32; else return c;
 }
 
-/* the token stream */
-void nexttoken() {
-  address_t k, l, i;
-  char* ir;
-  char quotechar;
-
+/* Keep token execution available while the source lexer is overlaid. */
+void lex_input(void);
+void nexttoken(void) {
+  fastticker();
   /* RUN mode vs. INT mode, in RUN mode we read from mem via gettoken() */
   if (st == SRUN || st == SERUN) {
-    /* in the token stream we call fastticker - all fast timing functions are in stream */
-    fastticker();
+    /* Input and execution token scans both cooperate with CENTOS. */
     /* read the token from memory */
     gettoken();
     /* show what we are doing */
@@ -3207,6 +3257,37 @@ void nexttoken() {
     }
     return;
   }
+  lex_input();
+}
+
+/* The CENTOS source loader visits this dictionary twice. Keep the original
+   prefix-match order within each first-character bucket. Indices are one
+   based so a zero-filled head denotes an empty bucket. */
+#if defined(STBASIC_COMMANDS) && defined(STEFAN_CENTOS) && defined(STEFAN_TINY) && !defined(ARDUINOPROGMEM)
+#define CENTOS_KEYWORD_BUCKETS
+static uint8_t keyword_head[32], keyword_link[sizeof(tokens) / sizeof(tokens[0])];
+static uint8_t keywords_indexed;
+typedef char keyword_index_fits[sizeof(keyword_link) <= 256 ? 1 : -1];
+
+static uint8_t first_keyword(char c) {
+  if (!keywords_indexed) {
+    for (unsigned entry = sizeof(keyword_link) - 1; entry; --entry) {
+      unsigned bucket = (unsigned char)keyword[entry - 1][0] & 31u;
+      keyword_link[entry - 1] = keyword_head[bucket];
+      keyword_head[bucket] = (uint8_t)entry;
+    }
+    keywords_indexed = 1;
+  }
+  return keyword_head[(unsigned char)btoupper(c) & 31u];
+}
+#endif
+
+/* The source lexer returns before execution can select another overlay. */
+void lex_input(void) {
+  address_t k, l, i;
+  char* ir;
+  char quotechar;
+
 
   /* after change in buffer logic the first byte is reserved for the length */
   if (bi == ibuffer) bi++;
@@ -3252,7 +3333,11 @@ void nexttoken() {
       k++;
       bi++;
     }
-    bi++;
+#ifdef STEFAN_CENTOS
+    if(k>255){error(ESTRING);token=EOL;return;}
+#endif
+    /* The original dialect also permits a quote terminated by end of line. */
+    if(*bi)bi++;
     token = STRING;
     sr.length = k;
     sr.address = 0; /* we don't find the string in BASIC memory, as we lex from bi */
@@ -3349,19 +3434,17 @@ void nexttoken() {
    	Keywords are an array of null terminated strings.
       They are always matched uppercase.
   */
-  k = 0;
-  while (gettokenvalue(k) != 0) {
-    ir = getkeyword(k);
+#ifdef CENTOS_KEYWORD_BUCKETS
+  for (uint8_t entry = first_keyword(*bi); entry; entry = keyword_link[k]) {
+    k = entry - 1;
+    const char *spelling = keyword[k];
+#else
+  for (k = 0; gettokenvalue(k) != 0; ++k) {
+    const char *spelling = getkeyword(k);
+#endif
     i = 0;
-    while (*(ir + i) != 0) {
-      if (*(ir + i) != btoupper(*(bi + i))) {
-        k++;
-        i = 0;
-        break;
-      } else
-        i++;
-    }
-    if (i == 0) continue;
+    while (spelling[i] && spelling[i] == btoupper(bi[i])) ++i;
+    if (spelling[i] || i == 0) continue;
     bi += i;
     token = gettokenvalue(k);
     if (token == TREM) lexliteral = 1;
@@ -3467,7 +3550,18 @@ void nexttoken() {
     sure that we don't hit himem. On systems with EEPROM program storage we make
     sure that we stay within the EEPROM range.
 */
+#ifdef STEFAN_CENTOS
+/* At most one entered line is staged as tokens. This also lets a full program
+   replace or delete an existing line without needing spare program-arena bytes. */
+#define LINE_TOKEN_CAPACITY (3 * BUFSIZE)
+static mem_t line_tokens[LINE_TOKEN_CAPACITY];
+static address_t line_origin;
+static unsigned char line_staging;
+#endif
 char nomemory(number_t b) {
+#ifdef STEFAN_CENTOS
+  if (line_staging) return (unsigned)(top-line_origin)+(unsigned)b>LINE_TOKEN_CAPACITY;
+#endif
 #ifndef EEPROMMEMINTERFACE
   if (top >= himem - b) return 1; else return 0;
 #else
@@ -3479,15 +3573,24 @@ char nomemory(number_t b) {
 void storetoken() {
   int i;
 
+#if defined(STBASIC_COMMANDS) && defined(STEFAN_CENTOS) && !defined(EEPROMMEMINTERFACE)
+  /* Token lengths are byte counts. Calculate the remaining space once
+     without converting the counts to and from BASIC's number_t (float). */
+  unsigned available = line_staging ? LINE_TOKEN_CAPACITY - (unsigned)(top - line_origin) :
+                       top < himem ? (unsigned)(himem - top - 1) : 0;
+#define TOKEN_TOO_LARGE(bytes) ((unsigned)(bytes) > available)
+#else
+#define TOKEN_TOO_LARGE(bytes) nomemory(bytes)
+#endif
   switch (token) {
     case LINENUMBER:
-      if (nomemory(addrsize + 1)) break;
+      if (TOKEN_TOO_LARGE(addrsize + 1)) break;
       memwrite2(top++, token);
       setaddress(top, memwrite2, ax);
       top += addrsize;
       return;
     case NUMBER:
-      if (nomemory(numsize + 1)) break;
+      if (TOKEN_TOO_LARGE(numsize + 1)) break;
       memwrite2(top++, token);
       setnumber(top, memwrite2, x);
       top += numsize;
@@ -3495,13 +3598,13 @@ void storetoken() {
     case ARRAYVAR:
     case VARIABLE:
     case STRINGVAR:
-      if (nomemory(sizeof(name_t))) break;
+      if (TOKEN_TOO_LARGE(sizeof(name_t))) break;
       memwrite2(top++, token);
       top = setname_pgm(top, &name);
       return;
     case STRING:
       i = sr.length;
-      if (nomemory(i + 2)) break;
+      if (TOKEN_TOO_LARGE(i + 2)) break;
       memwrite2(top++, token);
       memwrite2(top++, i);
       while (i > 0) {
@@ -3511,17 +3614,19 @@ void storetoken() {
       return;
     default:
       if (token >= -127) { /* the good old code with just one byte token */
-        if (nomemory(1)) break;
+        if (TOKEN_TOO_LARGE(1)) break;
         memwrite2(top++, token);
       } else {
 #ifdef HASLONGTOKENS
-        if (nomemory(2)) break; /* this is the two byte token extension */
+        if (TOKEN_TOO_LARGE(2)) break; /* this is the two byte token extension */
         memwrite2(top++, TEXT1);
         memwrite2(top++, token + 255);
 #endif
       }
       return;
   }
+#undef TOKEN_TOO_LARGE
+  error(EOUTOFMEMORY);
 }
 
 
@@ -3559,6 +3664,9 @@ mem_t memread2(address_t a) {
 }
 
 void memwrite2(address_t a, mem_t c) {
+#ifdef STEFAN_CENTOS
+  if (line_staging) { line_tokens[a-line_origin]=c; return; }
+#endif
   mem[a] = c;
 }
 #else
@@ -3599,6 +3707,11 @@ void memwrite2(address_t a, mem_t c) {
 /* get a token from memory */
 void gettoken() {
   stringlength_t i;
+#ifdef __CPU6_OS6__
+  /* Utility scans (findline, storage and listing) also use gettoken directly. */
+  static unsigned char scan_tick;
+  if (!(++scan_tick & 15)) byield();
+#endif
 
   /* if we have reached the end of the program, EOL is always returned
   		we don't rely on mem having a trailing EOL */
@@ -3832,6 +3945,84 @@ void diag() {
 }
 #endif
 
+#ifdef STEFAN_CENTOS
+/* The text loader stages only one line, using the same lexer and token scratch
+   as interactive input. Its larger I/O record is independent of ibuffer. */
+#ifdef STBASIC_COMMANDS
+unsigned bas_staged_line;
+int bas_stage(char *text)
+{
+  address_t original=top,length;unsigned n=0,ticks=0;
+  while(*text==' '||*text=='\t')text++;
+  if(!*text)return 0;
+  if(*text<'0'||*text>'9')return -1;
+  while(*text>='0'&&*text<='9'){
+    if(n>6553U||(n==6553U&&*text>'5'))return -1;
+    n=n*10U+(*text++-'0');
+  }
+  if(!n||*text=='.'||*text=='E'||*text=='e')return -1;
+  while(*text==' '||*text=='\t')text++;
+  if(!*text)return 0;
+  bas_staged_line=n;bi=text;st=SINT;lexliteral=0;
+  line_origin=original;line_staging=1;ax=n;token=LINENUMBER;
+  do {
+    storetoken();
+    if (er) break;
+    if (!(++ticks & 15u)) fastticker();
+    lex_input();
+  } while (token != EOL);
+  line_staging=0;length=top-original;top=original;lexliteral=0;here=0;
+  return er?-1:(int)length;
+}
+void bas_copy(unsigned offset,unsigned length)
+{unsigned i;for(i=0;i<length;i++){mem[offset+i]=line_tokens[i];if(!(i&63))byield();}}
+#endif
+void storeline() {
+  address_t wanted=ax, original=top, start=top, end=top, at, length=0, delta;
+  unsigned removing;
+  clrlinecache();
+  whitespaces(); removing=*bi==0;
+  /* Locate the old record before tokenization changes the parser globals. */
+  here=0;
+  while (here<original) {
+    at=here; gettoken();
+    if(token==LINENUMBER&&ax>=wanted){
+      start=end=at;
+      if(ax==wanted){
+        while(here<original){at=here;gettoken();if(token==LINENUMBER){end=at;break;}}
+        if(token!=LINENUMBER||ax==wanted)end=original;
+      }
+      break;
+    }
+  }
+  if(!removing){
+    line_origin=original;line_staging=1;ax=wanted;token=LINENUMBER;
+    do {
+      storetoken();if(er)break;
+#ifdef STBASIC_COMMANDS
+      if(bas_ed_preserve){
+        char *begin=bi;
+        if(!lexliteral)while(*begin==' '||*begin=='\t')begin++;
+        nexttoken();bas_ed_token((unsigned)(begin-ibuffer-1),(unsigned)(bi-begin));
+      }else
+#endif
+        nexttoken();
+    } while(token!=EOL);
+    line_staging=0;length=top-original;top=original;
+    if(er){here=0;return;}
+  }
+  if(length>himem-(original-(end-start))){error(EOUTOFMEMORY);here=0;return;}
+  if(length>end-start){
+    delta=length-(end-start);
+    for(at=original;at>end;at--){mem[at+delta-1]=mem[at-1];if(!(at&63))byield();}
+  }else if(length<end-start){
+    delta=(end-start)-length;
+    for(at=end;at<original;at++){mem[at-delta]=mem[at];if(!(at&63))byield();}
+  }
+  for(at=0;at<length;at++){mem[start+at]=line_tokens[at];if(!(at&63))byield();}
+  top=original-(end-start)+length;here=0;token=EOL;
+}
+#else
 void storeline() {
   const index_t lnlength = addrsize + 1;
   index_t linelength;
@@ -3964,6 +4155,8 @@ void storeline() {
   }
 }
 
+#endif
+
 /*
    Layer 1 - the code in this section calculates an expression
    with a recursive descent algorithm
@@ -4080,6 +4273,13 @@ void parsefunction(void (*f)(), short ae) {
   if (args == ae) f(); else error(EARGS);
 }
 
+#ifdef STEFAN_CENTOS
+static unsigned char parse_depth;
+static int parse_enter(void) {
+  if (parse_depth >= 12) { error(ESTACK); return 0; }
+  parse_depth++; return 1;
+}
+#endif
 /* helper function in the recursive decent parser */
 void parseoperator(void (*f)()) {
   mem_t u = 1;
@@ -4091,7 +4291,13 @@ void parseoperator(void (*f)()) {
     nexttoken();
   }
   /* the operator */
+#ifdef STEFAN_CENTOS
+  if (!parse_enter()) return;
+#endif
   f();
+#ifdef STEFAN_CENTOS
+  parse_depth--;
+#endif
   if (er != 0 ) return;
   y = pop();
   if (u == -1) y = -y;
@@ -4240,7 +4446,7 @@ void sqr() {
 }
 #else
 void sqr() {
-  push(sqrt(pop()));
+  push(sqrtf(pop()));
 }
 #endif
 
@@ -4261,7 +4467,7 @@ void xpow() {
 /* while this is needed by ^*/
 number_t bpow(number_t x, number_t y) {
 #ifdef HASFLOAT
-  return pow(x, y);
+  return sb_pow(x, y);
 #else
   number_t r;
   address_t i;
@@ -4455,7 +4661,7 @@ char stringvalue(string_t* strp) {
       if (base == 10) {
         strp->length = writenumber2(sbuffer, n);
       } else {
-        n = floor(n);
+        n = floorf(n);
         strp->length = writenumbern(sbuffer, n, base);
       }
 #else
@@ -4691,25 +4897,25 @@ neq:
    no handling of floating point errors yet.
 */
 void xsin() {
-  push(sin(pop()));
+  push(sinf(pop()));
 }
 void xcos() {
-  push(cos(pop()));
+  push(cosf(pop()));
 }
 void xtan() {
-  push(tan(pop()));
+  push(tanf(pop()));
 }
 void xatan() {
-  push(atan(pop()));
+  push(atanf(pop()));
 }
 void xlog() {
-  push(log(pop()));
+  push(logf(pop()));
 }
 void xexp() {
-  push(exp(pop()));
+  push(expf(pop()));
 }
 void xint() {
-  push(floor(pop()));
+  push(floorf(pop()));
 }
 #else
 void xint() {}
@@ -5183,7 +5389,17 @@ void factorasc() {
 #endif
 }
 
+#ifdef STEFAN_CENTOS
+static void factor_body(void);
 void factor() {
+  if (!parse_enter()) return;
+  factor_body();
+  parse_depth--;
+}
+static void factor_body(void) {
+#else
+void factor() {
+#endif
   if (DEBUG) bdebug("factor\n");
   switch (token) {
     case NUMBER:
@@ -5269,14 +5485,21 @@ void factor() {
       if (er != 0 ) return;
       break;
 #endif
-      /*  Stefan's tinybasic additions */
-#ifdef HASSTEFANSEXT
+#if defined(HASCONSOLESCALARS) && !defined(HASAPPLE1)
+    case TSGN:
+      parsefunction(xsgn, 1);
+      break;
+#endif
+      /* Stefan's scalar math is also available in the console profile. */
+#if defined(HASSTEFANSEXT) || defined(HASCONSOLESCALARS)
     case TSQR:
       parsefunction(sqr, 1);
       break;
+#ifdef HASSTEFANSEXT
     case TMAP:
       parsefunction(xmap, 5);
       break;
+#endif
     case TPOW:
       parsefunction(xpow, 2);
       break;
@@ -5446,12 +5669,14 @@ nextfactor:
       return;
     }
     goto nextfactor;
-  } else if (token == '%') {
+  } else if (token == '%' || token == TMOD) {
     parseoperator(power);
     if (!USELONGJUMP && er) return;
     if (y != 0)
 #ifndef HASFLOAT
       push(x % y);
+#elif defined(STEFAN_CENTOS)
+      { number_t remainder=sb_mod(x,y); if(er)return;push(remainder); }
 #else
       push((int)x % (int)y);
 #endif
@@ -5501,12 +5726,14 @@ nextfactor:
       return;
     }
     goto nextfactor;
-  } else if (token == '%') {
+  } else if (token == '%' || token == TMOD) {
     parseoperator(factor);
     if (!USELONGJUMP && er) return;
     if (y != 0)
 #ifndef HASFLOAT
       push(x % y);
+#elif defined(STEFAN_CENTOS)
+      { number_t remainder=sb_mod(x,y); if(er)return;push(remainder); }
 #else
       push((int)x % (int)y);
 #endif
@@ -5569,7 +5796,7 @@ void compexpression() {
 #ifndef HASFLOAT
       push(x == y ? booleanmode : 0);
 #else
-      if (fabs(x - y) <= epsilon) push(booleanmode); else push(0);
+      if (fabsf(x - y) <= epsilon) push(booleanmode); else push(0);
 #endif
       break;
     case NOTEQUAL:
@@ -5578,7 +5805,7 @@ void compexpression() {
 #ifndef HASFLOAT
       push(x != y ? booleanmode : 0);
 #else
-      if (fabs(x - y) > epsilon) push(booleanmode); else push(0);
+      if (fabsf(x - y) > epsilon) push(booleanmode); else push(0);
 #endif
       break;
     case '>':
@@ -5604,7 +5831,7 @@ void compexpression() {
   }
 }
 
-#ifdef HASAPPLE1
+#if defined(HASAPPLE1) || defined(HASCONSOLESCALARS)
 /* boolean NOT */
 void notexpression() {
   if (DEBUG) bdebug("notexp\n");
@@ -6389,7 +6616,7 @@ processelse:
   }
 
   /* a THEN is interpreted as simple one statement goto	if it is followed by a line number*/
-#ifdef HASAPPLE1
+#if defined(HASAPPLE1) || defined(HASCONSOLESCALARS)
   /* then can be on a new line */
   if (token == TTHEN) {
     nexttoken();
@@ -6740,7 +6967,14 @@ void outputtoken() {
 
   switch (token) {
     case NUMBER:
-      outnumber(x);
+#ifdef STBASIC_COMMANDS
+      if(od==0){
+        unsigned start=(unsigned char)ibuffer[0];
+        outnumber(x);
+        bas_ed_note(start,(unsigned char)ibuffer[0]-start,here-numsize);
+      }else
+#endif
+        outnumber(x);
       break;
     case LINENUMBER:
       outnumber(ax);
@@ -6754,13 +6988,17 @@ void outputtoken() {
       if (token == STRINGVAR) outch('$');
       break;
     case STRING:
-      outch('"');
+      {
+      char quote='"';
 #ifdef USEMEMINTERFACE
       if (!sr.ir) getstringtobuffer(&sr, spistrbuf1, SPIRAMSBSIZE);
 #endif
+      for(i=0;i<sr.length;i++)if(sr.ir[i]=='"')quote='\'';
+      outch(quote);
       outs(sr.ir, sr.length);
-      outch('"');
+      outch(quote);
       break;
+      }
     default:
       if ( (token < 32 && token >= BASEKEYWORD) || token < -127) {
         if ((token == TTHEN ||
@@ -7007,6 +7245,11 @@ done:
   st = SINT;
   nexttoken();
   if (token == NUMBER) {
+#ifdef STEFAN_CENTOS
+    if (!(x>=1.0f && x<=65535.0f) || x!=(number_t)(address_t)x) {
+      error(ELINE); reseterror(); return;
+    }
+#endif
     ax = x;
     storeline();
   }
@@ -7034,6 +7277,20 @@ void xrun() {
       error(EARGS);
       return;
     }
+#ifdef STBASIC_COMMANDS
+    {
+      extern int bas_is_typed(void);
+      extern void bas_run_typed(unsigned);
+      if (st == SINT && bas_is_typed()) {
+        number_t start = args ? pop() : 0;
+        if (!(start >= 0 && start <= 65535.0f) || start != (address_t)start)
+          error(ELINE);
+        else
+          bas_run_typed((address_t)start);
+        return;
+      }
+    }
+#endif
     if (args == 0) {
       here = 0;
     } else {
@@ -10964,14 +11221,26 @@ void loop() {
 
   /* the prompt and the input request */
   printmessage(MPROMPT);
+#ifdef STEFAN_CENTOS
+  (void) ins(ibuffer, BUFSIZE);
+#else
   (void) ins(ibuffer, BUFSIZE - 2);
+#endif
 
+#ifdef STBASIC_COMMANDS
+  { extern int bas_command(char *); if (bas_command(ibuffer + 1)) return; }
+#endif
   /* tokenize first token from the input buffer */
   bi = ibuffer;
   nexttoken();
 
   /* a number triggers the line storage, anything else is executed */
   if (token == NUMBER) {
+#ifdef STEFAN_CENTOS
+    if (!(x>=1.0f && x<=65535.0f) || x!=(number_t)(address_t)x) {
+      error(ELINE); reseterror(); return;
+    }
+#endif
     ax = x;
     storeline();
 

@@ -1,0 +1,16 @@
+{
+  "project": "Stefan BASIC",
+  "url": "https://github.com/slviajero/tinybasic",
+  "commit": "86ec458ca3dac9d156ce23bfa28a99f1f39ca656",
+  "startingPort": "experiments/stefan-basic/port",
+  "originalSha256": {
+    "hardware.h": "8f282062b3d60baf6784be105cb6924b0d3b3e4f2929bbbc51097c06f2a7323a",
+    "common.h": "9eb6899765f42e1b2c7feafa5057baf4dc3948d385496443152a23846a0c6295",
+    "basic.c": "16b5e991ec8eb2ec417f2b92aa4cba4f830be66efe3ed82debf37c07a94f6bf3",
+    "language.h": "d1f5cf2921260612c678194d23d1e441ef6d4bea32085b0e98975ebcb68ab02a",
+    "runtime.h": "5cf1cd6df0519f30d11321cf5e08bb304b272e00bd7b159b8b8c03058c32cccb",
+    "basic.h": "7567c488447c36451780de9fc53ff0f0fc8f2a7d610b8b5388fcf79eb40d0370",
+    "LICENSE": "2852f6d8afc434f02edf847643a64412683259df3fa14d2a77b1f687e6524864"
+  },
+  "notices": "Upstream LICENSE and source notices retained verbatim."
+}

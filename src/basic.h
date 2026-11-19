@@ -36,7 +36,11 @@
 #define STRSIZEDEF      32
 
 /* the maximum name length */
-#define MAXNAME         32
+#ifdef HASLONGNAMES
+#define MAXNAME         8
+#else
+#define MAXNAME         2
+#endif
 
 /*
  * The tokens for the BASIC keywords
@@ -216,6 +220,8 @@
 #define TSHL 9
 #define TSHR 11
 #define TBIT 12
+#define TDEFINT 13
+#define TMOD 14
 /* 
  * Extension tokens can be in the range from -128 upwards.
  * one needs to set HASLONGTOKENS. Currently ony one set of 
@@ -299,10 +305,10 @@
 #ifdef HASFLOAT
 #ifdef HAS64BIT
 typedef double number_t;
-typedef long long wnumber_t;
+typedef int32_t wnumber_t;
 #else
 typedef float number_t;
-typedef long long wnumber_t;
+typedef int32_t wnumber_t;
 #endif
 #else
 #ifdef HAS64BIT

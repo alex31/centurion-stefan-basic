@@ -1,0 +1,9 @@
+{
+  "source": "experiments/centos-mmu/automatic",
+  "files": {
+    "runtime.c": "a438acabf4c900f9dbefedd25bc876e4016363c83a29eaeb83e0dbe653662eb8",
+    "gate.s": "2fa86553b879fe313f61c874e2d1e1ebf9cf60aae06948d63c6c80e8cd1248a5",
+    "module-start.s": "35ed1d554b1fdf7e9d15efbcd6eb4eaca328e45cad6bdcc54b56e30062d36abd"
+  },
+  "adaptation": "placement is selected by the dedicated BASIC builder; original attribute removed from runtime C"
+}
