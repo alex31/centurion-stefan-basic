@@ -143,10 +143,51 @@ isub:
     sab
 sum_done:
     jn rangeerr         /* F is the signed overflow flag */
+integer_done:
     stb -8(y)
     dcr y,4
     inx
     jmp poll
+
+/* DIV returns the unsigned quotient in B and remainder in A. A signed
+   quotient takes the XOR of the signs, a remainder the dividend's sign. */
+idiv:
+    ldb -4(y)
+    jz divzeroerr
+    lda -8(y)
+    ore b,a
+    sta (s)
+    jsr divide_magnitudes
+    lda (s)
+    bm negate_division
+    ori b,b
+    jlt rangeerr        /* The only positive overflow is -32768 / -1. */
+    bra integer_done
+imod:
+    ldb -4(y)
+    jz divzeroerr
+    jsr divide_magnitudes
+    xab
+    lda -8(y)
+    bp integer_done
+negate_division:
+    ivr b
+    inr b
+    bra integer_done
+
+divide_magnitudes:
+    lda -8(y)
+    bp dividend_magnitude
+    iva
+    ina
+dividend_magnitude:
+    ori b,b
+    bp divisor_magnitude
+    ivr b
+    inr b
+divisor_magnitude:
+    div b,a
+    rsr
 
 /* A indexes a pair (base, exclusive bound), B is the subscript.
    JSR saves the bytecode IP on the stack. Borrow X for the descriptor
@@ -451,6 +492,9 @@ looperr:
     bra finish
 stackerr:
     ldb -7
+    bra finish
+divzeroerr:
+    ldb -8
 finish:
     stb (s)
     lda 10(s)

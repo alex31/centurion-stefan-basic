@@ -238,7 +238,7 @@ syntax:
 static unsigned binary(struct ib_compile *c, token_t t, unsigned a, unsigned b)
 {
     unsigned op;
-    unsigned real = a == IB_REAL || b == IB_REAL || t == '/' || t == '^';
+    unsigned real = a == IB_REAL || b == IB_REAL || t == '^';
     if (a == IB_STRING || b == IB_STRING) {
         c->comparison = 0;
         if (a != b) goto string_type;
@@ -278,7 +278,7 @@ static unsigned binary(struct ib_compile *c, token_t t, unsigned a, unsigned b)
     case '+': op = IB_IADD; break;
     case '-': op = IB_ISUB; break;
     case '*': op = IB_IMUL; break;
-    case '/': op = IB_FDIV; break;
+    case '/': op = real ? IB_FDIV : IB_IDIV; break;
     case '^': op = IB_FPOW; break;
     case TMOD: case '%': op = IB_FMOD; break;
     case '=': op = IB_IEQ; break;

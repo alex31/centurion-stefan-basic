@@ -21,6 +21,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   await command('STARTBASIC');checks.push('native startup job loads MMU and opens REPL');
   let output=await command('PRINT "CHECK ";SIN(0);" ";COS(0);" ";LOG(EXP(2));" ";2^10');
   assert.ok(output.includes('CHECK 0 1 2 1024'),output);
+  output=await command('PRINT "REAL DIV ";7/2');
+  assert.match(output,/\nREAL DIV 3\.5 *\r?\n/,output);
   output=await command('PRINT "REAL ";300*300;" ";ABS(EXP(LOG(3.5))-3.5)<.0001;" ";2^3^2');
   assert.ok(output.includes('REAL 90000 -1 512'),output);
   output=await command('PRINT "SQUARE ";(-3)^2;",";0^2');
@@ -88,6 +90,26 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   output=await command('X');assert.ok(output.includes('\x07'),output);
   await command('.NEW');
   checks.push('maximum-length displayed line refuses unsafe insertion');
+  for(const line of [
+   '5 DEFINT I,J,S',
+   '10 I=7:J=2:R=2',
+   '20 PRINT "DIV ";I/J;",";-I/J;",";I/-J;",";-I/-J',
+   '30 X=I/J:PRINT "MIXED ";X;",";I/R;",";R/(J*2)',
+   '31 PRINT "LITERALS ";I/10;",";ABS(I/10.5-0.666667)<.000001',
+   '40 S=0:FOR I=1 TO 10:S=S+I/30:NEXT I:PRINT "SUM ";S',
+   '50 I=-32768:PRINT "LIMITS ";I/1;",";I/I;",";1/I;",";I MOD -1',
+  ]) await command(line);
+  output=await command('.RUN');
+  assert.match(output,/\nDIV 3,-3,-3,3 *\r?\n/,output);
+  assert.match(output,/\nMIXED 3,3\.5,0\.5 *\r?\n/,output);
+  assert.match(output,/\nLITERALS 0,-1 *\r?\n/,output);
+  assert.match(output,/\nSUM 0 *\r?\n/,output);
+  assert.match(output,/\nLIMITS -32768,1,0,0 *\r?\n/,output);
+  output=await command('PRINT I/0');assert.match(output,/Division by zero/,output);
+  output=await command('PRINT I/-1');assert.match(output,/out of range/,output);
+  output=await command('PRINT -7 MOD 3;",";7 MOD -3');assert.match(output,/\n-1 *,1 *\r?\n/,output);
+  await command('.NEW');
+  checks.push('signed integer division truncates, checks bounds and promotes mixed operands to real');
   output=await command('.DIR "BDEMO"');assert.ok(output.includes('0 files'),'BDEMO already exists; refusing to replace it');
   for(const line of fs.readFileSync(process.env.BASIC_SAMPLE,'ascii').trim().split(/\r?\n/))await command(line);
   output=await command('.RUN');assert.ok(output.includes('SUM 55')&&output.includes('SQRT2 1.41421'),output);

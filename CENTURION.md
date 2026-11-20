@@ -11,6 +11,11 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
 - The compiler and bytecode VM execute stored programs and direct commands.
   Unqualified numeric variables start as float32. A `DEFINT` header selects
   16-bit integers for the named variables, and `DIM` supports numeric arrays.
+  With `DEFINT`, whole-valued literals in the signed 16-bit range also use
+  the integer type. The operators `+`, `-`, `*` and `/` use integer arithmetic
+  when both operands are integers and promote mixed operands to float32.
+  Integer division truncates toward zero. Use a real variable as an operand
+  to obtain a fractional quotient when both values are whole numbers.
   The VM includes real arithmetic, comparisons, power and the scalar math
   functions used by the console build.
 - `A$` through `Z$` are independent string variables. They support assignment,

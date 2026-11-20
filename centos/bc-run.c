@@ -22,7 +22,7 @@ typedef char ib_dispatch_layout[
     sizeof(struct ib_loop) == 11 && __builtin_offsetof(struct ib_loop, limit) == 0 &&
     __builtin_offsetof(struct ib_loop, step) == 4 && __builtin_offsetof(struct ib_loop, start) == 8 &&
     __builtin_offsetof(struct ib_loop, variable) == 10 && IB_INT == 1 && IB_SYNTAX == 1 &&
-    IB_RANGE == 4 && IB_LOOP == 6 && IB_STACK == 7 ? 1 : -1];
+    IB_RANGE == 4 && IB_LOOP == 6 && IB_STACK == 7 && IB_DIVZERO == 8 ? 1 : -1];
 #endif
 
 static inline unsigned vm_word(const uint8_t *p)
@@ -334,14 +334,22 @@ int ib_execute(struct ib_program *program)
             if (!ib_mul16(&sp[-1].integer, sp->integer))
                 goto range;
             break;
-        case IB_MOD:
+#ifndef STBASIC_VM_ASM
+        case IB_IDIV: case IB_MOD:
             --sp;
             if (!sp->integer) {
                 status = IB_DIVZERO;
                 goto done;
             }
-            sp[-1].integer = sp->integer == -1 ? 0 : sp[-1].integer % sp->integer;
+            if (op == IB_IDIV) {
+                if (sp[-1].integer == -32768 && sp->integer == -1)
+                    goto range;
+                sp[-1].integer /= sp->integer;
+            } else {
+                sp[-1].integer = sp->integer == -1 ? 0 : sp[-1].integer % sp->integer;
+            }
             break;
+#endif
         case IB_INEG:
             if (sp[-1].integer == -32768)
                 goto range;
