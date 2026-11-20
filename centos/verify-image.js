@@ -90,6 +90,45 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   output=await command('X');assert.ok(output.includes('\x07'),output);
   await command('.NEW');
   checks.push('maximum-length displayed line refuses unsafe insertion');
+  const listHelp='Q/Enter: exit';
+  async function browse(keys,marker=listHelp){
+   const from=s.output.length;
+   await s.send(keys);
+   await s.waitFor(marker,from,20000);
+   return s.output.slice(from);
+  }
+  const listStart=(text,line)=>assert.ok(text.includes('\x1b[H\x1b[J'+line+' REM'),text);
+  for(let line=10;line<=260;line+=10){
+   await command(line+' REM '+(line===20?'X'.repeat(92)+'TAIL':'LINE'));
+  }
+  output=await browse('.LIST\r');listStart(output,10);
+  assert.ok(output.split('\r\n').find(row=>row.startsWith('20 REM X')).length<80,output);
+  assert.match(output,/\nX+TAIL *\r?\n/,output);
+  assert.doesNotMatch(output,/230 REM/);
+  output=await browse('\x1bOA');assert.ok(!output.includes('\x1b[H'),output);
+  output=await browse('\x1bOB');listStart(output,20);
+  output=await browse('\x1b[A');listStart(output,10);
+  output=await browse('\x1b[6~');listStart(output,230);
+  output=await browse('\x1b[6~');assert.ok(!output.includes('\x1b[H'),output);
+  output=await browse('\x1b[5~');listStart(output,10);
+  output=await browse('\x1bOC');listStart(output,230);
+  output=await browse('\x1bOD');listStart(output,10);
+  output=await browse('q','\x1b[?1l');assert.ok(output.includes('\x1b[?1l'));
+  await s.waitFor('> ',s.output.lastIndexOf('\x1b[?1l'),20000);
+  output=await command('.LIST 10');assert.match(output,/\n10 REM.*LINE/,output);
+  assert.doesNotMatch(output,/Q\/Enter: exit|20 REM/);
+  output=await browse('LIST\r');listStart(output,10);
+  output=await browse('\r','\x1b[?1l');assert.ok(output.includes('\x1b[?1l'));
+  await s.waitFor('> ',s.output.lastIndexOf('\x1b[?1l'),20000);
+  await command('.NEW');
+  await command('10 PRINT '+'.1;'.repeat(35)+'"TAIL"');
+  output=await browse('.LIST\r');
+  assert.match(output,/10 PRINT 0\.100000001/);
+  assert.match(output,/"TAIL"/);
+  await browse('Q','\x1b[?1l');
+  await s.waitFor('> ',s.output.lastIndexOf('\x1b[?1l'),20000);
+  await command('.NEW');
+  checks.push('LIST wraps long lines, scrolls by line and page, and exits with Q or Enter');
   for(const line of [
    '5 DEFINT I,J,S',
    '10 I=7:J=2:R=2',

@@ -77,7 +77,10 @@ int bas_command(char *line)
  switch(op){
  case BC_NONE:return 0;
  case BC_RUN:bas_run_program(bas_arg);break;
- case BC_LIST:listlines(bas_arg,bas_arg?bas_arg:65535U);if(bas_arg)outcr();break;
+ case BC_LIST:
+  if(bas_arg){listlines(bas_arg,bas_arg);outcr();}
+  else bas_list();
+  break;
  case BC_NEW:xnew();ib_reset();bas_current[0]=0;break;
  case BC_RENUM:if(bas_renum(bas_arg)){resetbasicstate();ib_reset();puts("Renumbered");}break;
  case BC_EDIT:bas_editor(bas_arg);break;

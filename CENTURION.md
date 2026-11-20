@@ -8,6 +8,10 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
 - The interpreter stores tokenized lines in a 4 KiB RAM arena and reads and
   writes native CENTOS text files. The console supports line editing, `.DIR`,
   `.LOAD`, `.SAVE` and `.RENUM`.
+- `LIST` and `.LIST` open a paged view of the program in memory. Up and Down
+  move one source line. Left and Right move one screen on a VT100, as do
+  Page Up and Page Down on keyboards with those keys. Press Q or Enter to
+  return to BASIC. `LIST n` and `.LIST n` print the specified line directly.
 - The compiler and bytecode VM execute stored programs and direct commands.
   Unqualified numeric variables start as float32. A `DEFINT` header selects
   16-bit integers for the named variables, and `DIM` supports numeric arrays.

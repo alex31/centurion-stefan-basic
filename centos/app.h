@@ -18,6 +18,7 @@ extern char bas_slot[11];
 extern char bas_name[BAS_PATTERN_MAX + 1],bas_current[11];
 enum {BC_NONE,BC_ERROR,BC_RUN,BC_LIST,BC_NEW,BC_EDIT,BC_RENUM,BC_SAVE,BC_LOAD,BC_DIR,BC_BYE,BC_HELP};
 void listlines(address_t,address_t);
+void bas_list(void);
 void resetbasicstate(void);
 unsigned bas_parse(const char *);
 int bas_command(char *);

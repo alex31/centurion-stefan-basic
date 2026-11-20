@@ -105,7 +105,7 @@ def main():
    'bas_finish_text':('int',[])}))
   if args.file_service.resolve()!=HERE/'files.c':
    GROUPS[-1][1]['bas_files']=('void',['unsigned'])
-  GROUPS.append(('text',{'bas_render':('unsigned',['unsigned']),
+  GROUPS.append(('text',{'bas_render':('unsigned',['unsigned']), 'bas_list':('void',[]),
    'bas_ftoa':('unsigned',['char *','float'])}))
   GROUPS.append(('directory',{'bas_query':('unsigned',['unsigned']),'bas_publish':('void',[]),
    'bas_dir_rename':('int',['const char *','const char *']),

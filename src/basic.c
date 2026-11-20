@@ -11306,8 +11306,9 @@ void loop() {
         else error(ELINE);
       } else error(ELINE);
     } else if (token == TLIST) {
+      extern void bas_list(void);
       nexttoken();
-      if (token == EOL) listlines(0,65535U);
+      if (token == EOL) bas_list();
       else if (token == NUMBER && x>=1.0f && x<=65535.0f && x==(number_t)(address_t)x) {
         unsigned line=(address_t)x;
         nexttoken();
