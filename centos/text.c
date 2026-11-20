@@ -1,7 +1,7 @@
 #include "app.h"
 #include "fileio.h"
 #include "decimal.h"
-#define LIST_ROWS 23
+#include "pager.h"
 #define LIST_COLUMNS 78 /* CENTOS emits a padding space before CR/LF. */
 enum { TEXT_RECORD, LIST_BUFFER, LIST_STREAM };
 
@@ -98,8 +98,8 @@ static unsigned list_rows(void)
    the VT100's automatic wrap setting cannot affect page boundaries. */
 static unsigned list_page(unsigned first,unsigned *second)
 {
- unsigned p=first,rows=LIST_ROWS;
- outsc("\033[H\033[J");
+ unsigned p=first,rows=BAS_PAGE_ROWS;
+ page_clear();
  while(p<top&&rows){
   unsigned next=render_line(p,LIST_BUFFER),height=list_rows(),offset=0;
   if(!next)return 0;
@@ -127,12 +127,12 @@ static unsigned list_page(unsigned first,unsigned *second)
    stays in the BASIC arena, including when lines wrap across several rows. */
 static unsigned list_back(unsigned first,unsigned page)
 {
- unsigned recent[LIST_ROWS],head=0,count=0,p=0,rows=LIST_ROWS;
+ unsigned recent[BAS_PAGE_ROWS],head=0,count=0,p=0,rows=BAS_PAGE_ROWS;
  while(p<first){
   if(mem[p]==LINENUMBER){
    recent[head++]=p;
-   if(head==LIST_ROWS)head=0;
-   if(count<LIST_ROWS)++count;
+   if(head==BAS_PAGE_ROWS)head=0;
+   if(count<BAS_PAGE_ROWS)++count;
   }
   p=bas_next(p);
   if(!p)return first;
@@ -140,7 +140,7 @@ static unsigned list_back(unsigned first,unsigned page)
  }
  while(count--){
   unsigned prev,height;
-  if(!head)head=LIST_ROWS;
+  if(!head)head=BAS_PAGE_ROWS;
   prev=recent[--head];
   if(!page)return prev;
   if(!render_line(prev,LIST_BUFFER))break;
@@ -152,48 +152,15 @@ static unsigned list_back(unsigned first,unsigned page)
  return first;
 }
 
-static unsigned list_character(void)
-{
-#ifdef __CPU6_OS6__
- extern int bas_rawkey(void);
- return bas_rawkey()&127;
-#else
- unsigned char c=inch();
- return stb_done||c=='\n'?13:c;
-#endif
-}
-
-static unsigned list_key(void)
-{
- unsigned key=list_character();
- if(key==27||key==5){
-  unsigned form=list_character();
-  if(form=='O'||form=='['){
-   key=list_character();
-   if(form=='['&&(key=='5'||key=='6')){
-    unsigned page=key;
-    key=list_character();
-    if(key=='~')return page=='5'?'D':'C';
-   }
-   while(key>=32&&key<64)key=list_character();
-   return key>='A'&&key<='D'?key:0;
-  }
-  key=form;
- }
- return key==13||key=='q'||key=='Q'?'Q':0;
-}
-
 void bas_list(void)
 {
  unsigned first=0,second,after,target;
  if(!top)return;
- outsc("\033[?1h");
+ page_begin();
  while((after=list_page(first,&second))!=0){
   target=first;
   do {
-   outsc("\033[24;1H\033[KLIST  Up/Down: line  Left/Right or PgUp/PgDn: page  Q/Enter: exit");
-   bas_flush();
-   switch(list_key()){
+   switch(page_key("LIST")){
    case 'Q':goto done;
    case 'A':target=list_back(first,0);break;
    case 'B':if(after<top)target=second;break;
@@ -205,5 +172,5 @@ void bas_list(void)
  }
  outsc("\033[24;1H\033[KUnable to list program\n");
 done:
- outsc("\033[?1l\033[24;1H\033[K");
+ page_end();
 }

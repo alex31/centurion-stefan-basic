@@ -12,6 +12,9 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
   files in the `SBASIC` library. The root `BASIC` command forwards to the
   library job, which probes the native memory map before loading the module
   and running `SBASIC.BASICEXE`.
+- BASIC `.DIR` lists numbered source files in alphabetical order. A quoted
+  wildcard pattern narrows the listing. Results that overflow the screen
+  use the same navigation keys as `LIST`.
 - `LIST` and `.LIST` open a paged view of the program in memory. Up and Down
   move one source line. Left and Right move one screen on a VT100, as do
   Page Up and Page Down on keyboards with those keys. Press Q or Enter to

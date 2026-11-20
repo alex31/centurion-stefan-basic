@@ -221,6 +221,30 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   output=await command('.RUN');assert.ok(output.includes('SUM 60'),output);await command('20 S=0');
   checks.push('inline navigation, edit, commit and program execution');
   output=await command('.SAVE "BDEMO"');assert.ok(output.includes('Saved'),output);
+  const dirNames=text=>text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g,'').split(/\r?\n/)
+   .map(line=>line.trim()).filter(line=>/^[A-Z0-9_@?]+$/.test(line));
+  async function listDirectory(query){
+   const text=await browse(query+'\r',/Q\/Enter: exit|\n> /);
+   if(text.includes(listHelp)){
+    await browse('q','\x1b[?1l');
+    await s.waitFor('> ',s.output.lastIndexOf('\x1b[?1l'),20000);
+   }
+   return text;
+  }
+  output=await listDirectory('.DIR');
+  const names=dirNames(output);
+  assert.deepEqual(names,[...names].sort(),output);
+  assert.ok(!names.includes('BASIC')&&!names.includes('BASICEXE')&&!names.includes('@PDIR0'),output);
+  if(!output.includes(listHelp)){
+   assert.ok(names.includes('BDEMO'),output);
+   assert.match(output,new RegExp('\\n'+names.length+' files'));
+  }
+  output=await listDirectory('.DIR "b*d*o"');
+  const expected=names.filter(name=>/^B.*D.*O$/.test(name));
+  assert.deepEqual(dirNames(output).slice(0,expected.length),expected,output);
+  output=await command('.DIR "BDEMO"');assert.match(output,/\nBDEMO *\r?\n1 files/,output);
+  output=await command('.DIR "BASIC"');assert.match(output,/\n0 files/,output);
+  checks.push('DIR lists only numbered text programs in alphabetical order and preserves wildcards');
   await command('.NEW');output=await command('.LOAD "BDEMO"');assert.ok(output.includes('Loaded'),output);
   output=await command('.RUN');assert.ok(output.includes('SUM 55'),output);
   assert.match(output,/\nDATA -7,CPU6:VT100,OK,2\.5,-6\.25/,output);
