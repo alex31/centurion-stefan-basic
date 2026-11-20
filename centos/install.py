@@ -6,6 +6,7 @@ HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[2]
 sys.path.insert(0,str(ROOT/'scripts'))
 from centos_text import encode
+from centos_disk import file_entry
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('directory',type=Path,help='directory containing the built BASIC.json and components')
 p.add_argument('-o',required=True,type=Path,help='new output image; never overwrite an existing disk')
@@ -20,7 +21,9 @@ d=json.loads((directory/'BASIC.json').read_text())
 if d.get('format')!='cpu6-stefan-mmu-overlays' or not {'files','directory','commands'}<={g['label'] for g in d['overlays']}:
  p.error('build the interactive application with --commands first')
 work=Path(tempfile.mkdtemp(prefix='basic-install-',dir=os.environ.get('CENTURION_IMAGE_WORK', ROOT/'build/out')));print('Results:',work,flush=True)
-original=hashlib.sha256(seed.read_bytes()).hexdigest()
+seed_data=seed.read_bytes()
+original=hashlib.sha256(seed_data).hexdigest()
+game_prefix='SDCC.' if a.check_games and file_entry(seed_data,'SDCC.XCHESS') else ''
 job=work/'SBASIC.BASIC.txt';job.write_bytes(encode((directory/'BASIC.job').read_text(encoding='ascii')))
 entry=work/'BASIC.txt';entry.write_bytes(encode('SBASIC.BASIC ON 1\n'))
 probe=work/'BASPROBE.exf'
@@ -46,7 +49,8 @@ with (work/'allocate.log').open('w') as log:
 qa=HERE/'verify-image.js'
 env=dict(os.environ,BASIC_SESSION=str(ROOT/'scripts/os6-session.js'),BASIC_IMAGE=str(work/'installed.img'),
  BASIC_OUTPUT=str(output),BASIC_SAMPLE=str(HERE/'demo.bas'),
- BASIC_GAMES='1' if a.check_games else '0',BASIC_RESULT=str(work/'validation.json'),BASIC_CONSOLE=str(work/'console.log'))
+ BASIC_GAMES='1' if a.check_games else '0',BASIC_GAME_PREFIX=game_prefix,
+ BASIC_RESULT=str(work/'validation.json'),BASIC_CONSOLE=str(work/'console.log'))
 output.parent.mkdir(parents=True,exist_ok=True)
 with (work/'verify.log').open('w') as log:subprocess.run(['node',qa],env=env,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=420)
 assert hashlib.sha256(seed.read_bytes()).hexdigest()==original

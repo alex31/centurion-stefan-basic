@@ -260,9 +260,10 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   await s.send('.BYE\r');await sleep(600);await command('.STA','STATUS DISPLAY');
   checks.push('the same BASIC command reenters the REPL with the loaded module and returns to CENTOS');
   if(process.env.BASIC_GAMES==='1'){
-   await command('.RUN XCONNECT4','Column (1-7), or Q to quit: ');
+   const prefix=process.env.BASIC_GAME_PREFIX||'';
+   await command('.RUN '+prefix+'XCONNECT4','Column (1-7), or Q to quit: ');
    await command('Q','End of Connect Four.');await command('.STA','STATUS DISPLAY');
-   await command('.RUN XCHESS','(W/B/2/Q): ');
+   await command('.RUN '+prefix+'XCHESS','(W/B/2/Q): ');
    await command('Q','End of Chess.');await command('.STA','STATUS DISPLAY');
    checks.push('both games run while the BASIC module remains loaded');
   }
