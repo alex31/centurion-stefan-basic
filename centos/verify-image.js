@@ -18,7 +18,10 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    assert.ok(!/ABORT\s+\d|JX\s*\d|Error|failed|refused/.test(output),output);
    return output;
   }
-  await command('STARTBASIC');checks.push('native startup job loads MMU and opens REPL');
+  const cold=await command('BASIC');
+  assert.match(cold,/\.LOAD BASIC SBASIC\.M[0-9A-F]{8}\b/,cold);
+  assert.match(cold,/\.RUN SBASIC\.BASICEXE\b/,cold);
+  checks.push('the BASIC command loads the module at cold boot and starts the library executable');
   let output=await command('PRINT "CHECK ";SIN(0);" ";COS(0);" ";LOG(EXP(2));" ";2^10');
   assert.ok(output.includes('CHECK 0 1 2 1024'),output);
   output=await command('PRINT "REAL DIV ";7/2');
@@ -225,11 +228,13 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   assert.match(output,/\nWHILE 2,\*{6}!/,output);
   checks.push('sample runs, saves as native BDEMO and reloads');
   await command('.BYE','FOR SYSRDR');await sleep(400);await command('.STA','STATUS DISPLAY');
-  await command('.RUN '+process.env.BASIC_PROGRAM);
+  const warm=await command('BASIC');
+  assert.doesNotMatch(warm,/\.LOAD BASIC\b/);
+  assert.match(warm,/\.RUN SBASIC\.BASICEXE\b/,warm);
   output=await command('.LOAD "BDEMO"');assert.ok(output.includes('Loaded'),output);
   output=await command('.RUN');assert.ok(output.includes('SUM 55'),output);
   await s.send('.BYE\r');await sleep(600);await command('.STA','STATUS DISPLAY');
-  checks.push('subsequent .RUN BASIC and return to CENTOS');
+  checks.push('the same BASIC command reenters the REPL with the loaded module and returns to CENTOS');
   if(process.env.BASIC_GAMES==='1'){
    await command('.RUN XCONNECT4','Column (1-7), or Q to quit: ');
    await command('Q','End of Connect Four.');await command('.STA','STATUS DISPLAY');

@@ -481,7 +481,16 @@ void bas_ov_end(void){if(active){active--;restore();}}
                  module_name:hashlib.sha256(output.with_suffix('.mmu.exf').read_bytes()).hexdigest(),
                  **{g['name']:hashlib.sha256(Path(g['path']).read_bytes()).hexdigest() for g in groups}})
   output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n');shutil.copy2(work/'program.map',output.with_suffix('.map'))
-  output.with_suffix('.job').write_text('.LOAD BASIC '+module_name+'\n.RUN '+name+'\n')
+  if args.commands:
+   output.with_suffix('.job').write_text(
+    '.JOB BASIC ABORT=CANCEL\n'
+    '.RUN SBASIC.BASPROBE\n'
+    '.SKIP 1 IF #C NE 250\n'
+    '.LOAD BASIC SBASIC.'+module_name+'\n'
+    '.RUN SBASIC.BASICEXE\n'
+    '.END\nS.CON\n')
+  else:
+   output.with_suffix('.job').write_text('.LOAD BASIC '+module_name+'\n.RUN '+name+'\n')
   print('PASS build: resident',result['residentEnd'],'MMU',occupied,'overlay slot',slot_size,'program memory',args.memory,flush=True)
  finally:
   (work/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')

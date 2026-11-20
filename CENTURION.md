@@ -8,6 +8,10 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
 - The interpreter stores tokenized lines in a 4 KiB RAM arena and reads and
   writes native CENTOS text files. The console supports line editing, `.DIR`,
   `.LOAD`, `.SAVE` and `.RENUM`.
+- The CENTOS image groups the interpreter, startup job, modules and source
+  files in the `SBASIC` library. The root `BASIC` command forwards to the
+  library job, which probes the native memory map before loading the module
+  and running `SBASIC.BASICEXE`.
 - `LIST` and `.LIST` open a paged view of the program in memory. Up and Down
   move one source line. Left and Right move one screen on a VT100, as do
   Page Up and Page Down on keyboards with those keys. Press Q or Enter to
@@ -66,7 +70,7 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
 Run `make basic` from the distribution root to produce the executable,
 mapped module and overlays with the SDK's native compiler runtime. Run
 `make basic-image SEED=/path/to/CENTOS_13.IMG`
-to install and boot-test BASIC on a new disk copy. Use `STARTBASIC` at the
+to install and boot-test BASIC on a new disk copy. Use `BASIC` at the
 CENTOS prompt.
 
 The original [LICENSE](LICENSE) and source notices are retained. The original

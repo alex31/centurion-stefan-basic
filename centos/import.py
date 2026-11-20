@@ -34,7 +34,7 @@ const {OS6Session}=require(process.env.BASIC_SESSION);const sleep=ms=>new Promis
   assert.ok(!/ABORT\s+\d|JX\s*\d|\bError\b|failed|refused/.test(out),out);
   if(expected)assert.ok(out.includes(expected),out);return out;
  }
- await cmd('STARTBASIC');await cmd('.NEW');
+ await cmd('BASIC');await cmd('.NEW');
  for(const line of JSON.parse(fs.readFileSync(process.env.BASIC_LINES)))await cmd(line);
  await cmd('.SAVE "'+process.env.BASIC_NAME+'"','Saved');
  await cmd('.NEW');await cmd('.LOAD "'+process.env.BASIC_NAME+'"','Loaded');

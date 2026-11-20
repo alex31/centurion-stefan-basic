@@ -13,7 +13,11 @@ int os6_file_close_raw(OS6_RCB *);
 #define basic_file storage.file
 static unsigned dir_offset,dir_sector;
 static int dir_error;
-static char dir_name[]={0xc0,0xd3,0xc4,0xc9,0xd2,0xb0,0};
+#define LIBRARY_PREFIX_SIZE 7
+static char dir_name[]={
+ 'S'|128,'B'|128,'A'|128,'S'|128,'I'|128,'C'|128,'.'|128,
+ '@'|128,'P'|128,'D'|128,'I'|128,'R'|128,'0'|128,0
+};
 static int dir_open(unsigned mode)
 {
  unsigned i;int status;OS6_RCB *r=&storage.directory.rcb;unsigned char *p=(unsigned char *)r;
@@ -88,11 +92,12 @@ int bas_dir_rename(const char *from,const char *to)
 static int text_error;
 int bas_io_open(const char *name,unsigned mode)
 {
- unsigned i;int status;char encoded[11];OS6_RCB *r=&text_file.rcb;
+ unsigned i;int status;char encoded[LIBRARY_PREFIX_SIZE+11];OS6_RCB *r=&text_file.rcb;
  unsigned char *raw=(unsigned char *)r;
  for(i=0;i<sizeof(*r);i++)raw[i]=0;
- for(i=0;i<10&&name[i];i++)encoded[i]=(unsigned char)name[i]|128;
- encoded[i]=0;text_file.mode=mode;text_file.offset=mode==1?400:0;text_error=0;
+ for(i=0;i<LIBRARY_PREFIX_SIZE;i++)encoded[i]=dir_name[i];
+ for(i=0;i<10&&name[i];i++)encoded[LIBRARY_PREFIX_SIZE+i]=(unsigned char)name[i]|128;
+ encoded[LIBRARY_PREFIX_SIZE+i]=0;text_file.mode=mode;text_file.offset=mode==1?400:0;text_error=0;
  r->control=0x2101;r->buffer_size=400;r->buffer=(uint8_t *)&text_file.block.length;
  r->record_flags=5;r->class_code=1;r->file_type=255;
  r->reserved2=(uint16_t)text_file.position;
