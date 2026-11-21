@@ -13,65 +13,52 @@
 IB_COUNT equ __COUNTER__
 
 _ib_dispatch:
-    stx (-s)
-    xfr y,a
-    sta (-s)
-    xfr z,a
-    sta (-s)
+    push xh,zl
     dcr s,2
     lda 10(s)           /* struct ib_cursor * */
     ldx (a)
-    ldb 2(a)
-    xfr b,y
-    ldb 6(a)
-    xfr b,z
+    ldw y,2(a)
+    ldw z,6(a)
 
 poll:
     dcr z
-    bnz fetch
+    bz poll_yield
+fetch:
+    cla
+    ldab (x)
+    sub a,IB_COUNT-1,b
+    bnl bad_op
+    sla
+    add a,handlers,b
+    jmp @(b)
+poll_yield:
     jsr _byield
-    ldb 64
-    xfr b,z
+    ldw z,64
     ldbb (_er)
     jnz stopped
     ldb (_stb_done)
     jnz stopped
-fetch:
-    ldbb (x)
-    clrb bh
-    lda IB_COUNT
-    sub b,a
-    bnl valid_opcode
+    bra fetch
+bad_op:
     jmp syntaxerr
-valid_opcode:
-    slr b
-    lda handlers
-    aab
-    ldb (b)
-    jmp (b)
 handlers:
 #define IB_OP(name, handler) .word handler
 #include "bc-ops.def"
 #undef IB_OP
 
 constant:
-    xfr y,a
-    ldb (_ib_stack_end)
-    sab
+    sub y,(_ib_stack_end),b
     jz stackerr
     ldb 1(x)
     inr x,3
     bra push_value
 loadvar:
-    xfr y,a
-    ldb (_ib_stack_end)
-    sab
+    sub y,(_ib_stack_end),b
     jz stackerr
-    clrb bh
-    ldbb 1(x)
-    lda _ib_state
-    aab
-    ldb (b)
+    cla
+    ldab 1(x)
+    add _ib_state,a
+    ldb (a)
     inr x,2
 push_value:
     stb (y)
@@ -81,9 +68,7 @@ push_value:
 storevar:
     cla
     ldab 1(x)
-    ldb _ib_state
-    aab
-    xfr b,a
+    add _ib_state,a
     dcr y,4
     ldb (y)
     stb (a)
@@ -92,24 +77,18 @@ storevar:
 
 /* Real tokens, scalar slots and stack entries use the same four bytes. */
 literalreal:
-    xfr y,a
-    ldb (_ib_stack_end)
-    sab
+    sub y,(_ib_stack_end),b
     jz stackerr
-    lda _mem
     ldb 1(x)
-    aab
+    add _mem,b
     inr x,3
     bra push_real
 loadreal:
-    xfr y,a
-    ldb (_ib_stack_end)
-    sab
+    sub y,(_ib_stack_end),b
     jz stackerr
     cla
     ldab 1(x)
-    ldb _ib_state
-    aab
+    add a,_ib_state,b
     inr x,2
 push_real:
     lda (b)
@@ -122,8 +101,7 @@ push_real:
 storereal:
     cla
     ldab 1(x)
-    ldb _ib_state
-    aab
+    add a,_ib_state,b
     dcr y,4
     lda (y)
     sta (b)
@@ -132,15 +110,13 @@ storereal:
     inr x,2
     jmp poll
 
-iadd:
-    lda -8(y)
-    ldb -4(y)
-    aab
-    bra sum_done
 isub:
-    lda -8(y)
     ldb -4(y)
-    sab
+    sub -8(y),b
+    bra sum_done
+iadd:
+    ldb -8(y)
+    add -4(y),b
 sum_done:
     jn rangeerr         /* F is the signed overflow flag */
 integer_done:
@@ -171,8 +147,7 @@ imod:
     lda -8(y)
     bp integer_done
 negate_division:
-    ivr b
-    inr b
+    ivr b,2
     bra integer_done
 
 divide_magnitudes:
@@ -183,61 +158,52 @@ divide_magnitudes:
 dividend_magnitude:
     ori b,b
     bp divisor_magnitude
-    ivr b
-    inr b
+    ivr b,2
 divisor_magnitude:
     div b,a
     rsr
 
 /* A indexes a pair (base, exclusive bound), B is the subscript.
    JSR saves the bytecode IP on the stack. Borrow X for the descriptor
-   and keep the local return link in the caller's scratch word. */
+   and keep the caller's X in the scratch word; out-of-range aborts directly. */
 element:
     stx 2(s)
-    ldx (_ib_arrays)
-    add a,x
+    add a,(_ib_arrays),x
     lda 2(x)
     sub b,a             /* unsigned index - count */
     bl bad_element
-    lda (x)
-    slr b
-    aab
+    add b,b
+    add 0(x),b
     ldx 2(s)
     rsr
 bad_element:
-    clr b
-    ldx 2(s)
-    rsr
+    inr s,2
+    ldx (s)
+    jmp rangeerr
 
 indexvar:
-    xfr y,a
-    ldb (_ib_stack_end)
-    sab
+    sub y,(_ib_stack_end),b
     jz stackerr
     cla
     ldab 1(x)
-    ldb _ib_state
-    aab
-    ldb (b)
+    add _ib_state,a
+    ldb (a)
     cla
     ldab 2(x)
     jsr element
-    ori b,b
-    jz rangeerr
     ldb (b)
     inr x,3
-    jmp push_value
+    stb (y)
+    inr y,4
+    jmp poll
 
 indexoff:
-    xfr y,a
-    ldb (_ib_stack_end)
-    sab
+    sub y,(_ib_stack_end),b
     jz stackerr
     cla
     ldab 1(x)
-    ldb _ib_state
-    aab
-    ldb (b)
+    add _ib_state,a
+    ldb (a)
     cla
     ldab 3(x)
     bp add_offset
@@ -248,23 +214,20 @@ add_offset:
     cla
     ldab 2(x)
     jsr element
-    ori b,b
-    jz rangeerr
     ldb (b)
     inr x,4
-    jmp push_value
+    stb (y)
+    inr y,4
+    jmp poll
 
 putvar:
     cla
     ldab 1(x)
-    ldb _ib_state
-    aab
-    ldb (b)
+    add _ib_state,a
+    ldb (a)
     cla
     ldab 2(x)
     jsr element
-    ori b,b
-    jz rangeerr
     dcr y,4
     lda (y)
     sta (b)
@@ -274,14 +237,11 @@ putvar:
 putconst:
     cla
     ldab 3(x)
-    ldb _ib_state
-    aab
-    ldb (b)
+    add _ib_state,a
+    ldb (a)
     cla
     ldab 4(x)
     jsr element
-    ori b,b
-    jz rangeerr
     lda 1(x)
     sta (b)
     inr x,5
@@ -290,18 +250,14 @@ putconst:
 /* Both arrays have the same scalar index. Save the budget while Z
    holds that index and use the scratch word for the value being copied. */
 copyvar:
-    xfr z,a
-    sta (-s)
+    push zh,zl
     cla
     ldab 1(x)
-    ldb _ib_state
-    aab
-    ldb (b)
-    xfr b,z
+    add _ib_state,a
+    ldw z,0(a)
     cla
     ldab 2(x)
-    ldb (_ib_arrays)
-    aab
+    add a,(_ib_arrays),b
     lda 2(b)
     sub z,a
     bl copy_range
@@ -312,31 +268,26 @@ copyvar:
     sta 2(s)
     cla
     ldab 3(x)
-    ldb (_ib_arrays)
-    aab
+    add a,(_ib_arrays),b
     lda 2(b)
     sub z,a
     bl copy_range
-    lda (b)
-    add z,a
-    add z,a
-    ldb 2(s)
-    stb (a)
-    lda (s+)
-    xaz
+    add z,z
+    add 0(b),z
+    lda 2(s)
+    sta (z)
+    pop zh,zl
     inr x,4
     jmp poll
 copy_range:
-    lda (s+)
-    xaz
+    pop zh,zl
     jmp rangeerr
 
 jvar:
     cla
     ldab 1(x)
-    ldb _ib_state
-    aab
-    lda (b)
+    add _ib_state,a
+    lda (a)
     ldb 2(x)
     inr x,5
     bra condition
@@ -393,9 +344,7 @@ jump:
 read_target:
     ldb (x)
 set_ip:
-    lda _mem
-    aab
-    xfr b,x
+    add b,_mem,x
     jmp poll
 
 /* The next-free loop pointer lives in cursor.loops. The packed frame
@@ -403,24 +352,21 @@ set_ip:
 nextloop:
     lda 10(s)
     ldb 4(a)
-    lda (_ib_loops)
-    sub b,a
+    sub b,(_ib_loops),a
     jz looperr
     stb (s)
     ldab -1(b)
     ldbb 1(x)
-    subb al,bl
+    subb bl,al
     jnz looperr
     clrb bh
-    ldbb 1(x)
+    orib bl,bl
     bm next_real
-    lda _ib_state
-    aab
+    add _ib_state,b
     stb (-s)            /* address of the control variable */
-    lda (b)
-    ldb 2(s)
-    ldb -7(b)
-    aab
+    ldb (b)
+    lda 2(s)
+    add -7(a),b
     bf next_overflow
     lda (s+)
     stb (a)
@@ -428,17 +374,16 @@ nextloop:
     ldab -7(a)
     bm next_down
     lda (s)
-    lda -11(a)
-    sab                 /* limit - current */
-    bra next_test
-next_down:
-    lda (s)
-    lda -11(a)
-    sub b,a             /* current - limit */
+    sub -11(a),b        /* limit - current */
 next_test:
     bf next_signed
     bp next_again
     bra next_done
+next_down:
+    lda (s)
+    lda -11(a)
+    sub b,a             /* current - limit */
+    bra next_test
 next_signed:
     bm next_again
     bra next_done
@@ -454,14 +399,14 @@ next_done:
 next_again:
     ldb (s)
     ldb -3(b)
-    bra set_ip
+    add b,_mem,x
+    jmp poll
 
 next_real:
     ldab 127
     andb al,bl
-    lda _ib_state
-    aab
-    lda 1
+    add _ib_state,b
+    clr a,1
     sta (-s)            /* advance */
     stb (-s)            /* variable */
     ldb 4(s)
@@ -499,72 +444,48 @@ finish:
     stb (s)
     lda 10(s)
     stx (a)
-    xfr y,b
-    stb 2(a)
-    xfr z,b
-    stb 6(a)
+    stw y,2(a)
+    stw z,6(a)
     ldb (s+)
-    lda (s+)
-    xaz
-    lda (s+)
-    xay
-    ldx (s+)
+    pop xh,zl
     rsr
 
 /* A one-character append to the last nonempty string only grows its
    descriptor and the heap tail. Let C handle all other cases, including
    compaction and error reporting, with X still on the same opcode. */
 sappend:
-    lda _mem
     ldb 2(x)
-    aab
+    add _mem,b
     ldab (b)
     dcrb al
     jnz slow
     stb (s)
-    xfr y,a
-    sta (-s)
-    clrb bh
-    ldbb 1(x)
-    slr b
-    slr b
-    lda _ib_string_vars
-    aab
-    xfr b,y
+    push yh,yl
+    cla
+    ldab 1(x)
+    sla
+    sla
+    add a,_ib_string_vars,y
     ldb 2(y)
-    ori b,b
     jz sappend_slow
-    lda IB_STRING_LIMIT
-    sab
+    sub b,IB_STRING_LIMIT,a
     jz sappend_slow
-    lda (y)
-    ldb 2(y)
-    aab
-    lda IB_STRING_HEAP_REF
-    sub b,a             /* tagged end - heap reference tag */
-    ldb (_ib_string_used)
-    sub b,a
+    add 0(y),b
+    add -IB_STRING_HEAP_REF,b
+    sub b,(_ib_string_used),a
     jnz sappend_slow
-    lda IB_STRING_HEAP_SIZE
-    sub b,a
+    sub b,IB_STRING_HEAP_SIZE,a
     jz sappend_slow
-    inr b
-    stb (_ib_string_used)
-    dcr b
-    lda _ib_string_heap
-    aab
+    inr (_ib_string_used)
+    add _ib_string_heap,b
     lda 2(s)
     ldab 1(a)
     stab (b)
-    ldb 2(y)
-    inr b
-    stb 2(y)
-    lda (s+)
-    xay
+    inr 2(y)
+    pop yh,yl
     inr x,4
     jmp poll
 sappend_slow:
-    lda (s+)
-    xay
+    pop yh,yl
     jmp slow
 ; CPU6 function _ib_dispatch end

@@ -9,13 +9,11 @@
 ; CPU6 function _ib_add16 begin
 _ib_add16:
 	lda 2(s)
-	lda (a)
 	ldb 4(s)
-	aab
+	add 0(a),b
 	bf add_range
-	lda 2(s)
 	stb (a)
-	ldb 1
+	clr b,1
 	rsr
 add_range:
 	clr b
@@ -25,13 +23,11 @@ add_range:
 ; CPU6 function _ib_sub16 begin
 _ib_sub16:
 	lda 2(s)
-	lda (a)
 	ldb 4(s)
-	sab
+	sub 0(a),b
 	bf sub_range
-	lda 2(s)
 	stb (a)
-	ldb 1
+	clr b,1
 	rsr
 sub_range:
 	clr b
@@ -51,13 +47,13 @@ _ib_mul16:
 	bp mul_right
 	ldb 8(s)
 	sub a,b
-	xfr b,a
+	xab
 mul_right:
 	ldb 8(s)
 	bp mul_check
 	ldb (x)
 	sub a,b
-	xfr b,a
+	xab
 mul_check:
 	ldb (s+)
 	bp mul_high
@@ -67,7 +63,7 @@ mul_high:
 	bnz mul_range
 	stb (x)
 	ldx (s+)
-	ldb 1
+	clr b,1
 	rsr
 mul_range:
 	ldx (s+)
