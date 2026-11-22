@@ -5,8 +5,8 @@ source import of the six interpreter files used by the port, from the POSIX
 target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
 [Upstream revision](https://github.com/slviajero/tinybasic/tree/86ec458ca3dac9d156ce23bfa28a99f1f39ca656/Basic2/Posix)
 
-- The interpreter stores tokenized lines in a 4 KiB RAM arena and reads and
-  writes native CENTOS text files. The console supports line editing, `.DIR`,
+- The distributed interpreter stores tokenized lines in a 5.5 KiB RAM arena
+  and reads and writes native CENTOS text files. The console supports line editing, `.DIR`,
   `.LOAD`, `.SAVE` and `.RENUM`.
 - The CENTOS image groups the interpreter, startup job, modules and source
   files in the `SBASIC` library. The root `BASIC` command forwards to the
@@ -53,8 +53,8 @@ target at commit `86ec458ca3dac9d156ce23bfa28a99f1f39ca656`.
   during bytecode execution and places sine, cosine, tangent, square
   roots and random number generation with the VM. Finite real squares
   use the native binary32 multiplication path.
-  The compact build keeps the 4 KiB program arena and the 20 KiB CENTOS
-  module budget.
+  The image reserves 1,536 bytes for the CPU stack and budgets 20 KiB for
+  the CENTOS module.
 - The CPU6 assembly dispatch loop keeps the instruction and value-stack
   pointers in registers. It copies real literals and scalars directly and
   handles common indexed operations and integer arithmetic. Real-to-integer
