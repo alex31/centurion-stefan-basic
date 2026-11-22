@@ -349,7 +349,6 @@ int ib_execute(struct ib_program *program)
                 sp[-1].integer = sp->integer == -1 ? 0 : sp[-1].integer % sp->integer;
             }
             break;
-#endif
         case IB_INEG:
             if (sp[-1].integer == -32768)
                 goto range;
@@ -358,6 +357,7 @@ int ib_execute(struct ib_program *program)
         case IB_NOT: sp[-1].integer = ~sp[-1].integer; break;
         case IB_AND: sp[-2].integer &= sp[-1].integer; --sp; break;
         case IB_OR:  sp[-2].integer |= sp[-1].integer; --sp; break;
+#endif
         case IB_IEQ: case IB_INE: case IB_ILT: case IB_ILE: case IB_IGT: case IB_IGE:
             sp[-2].integer = -integer_compare(op, sp[-2].integer, sp[-1].integer);
             --sp;

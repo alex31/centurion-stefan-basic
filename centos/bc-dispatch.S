@@ -91,22 +91,20 @@ loadreal:
     add a,_ib_state,b
     inr x,2
 push_real:
+    lda (b+)
+    sta (y+)
     lda (b)
-    sta (y)
-    lda 2(b)
-    sta 2(y)
-    inr y,4
+    sta (y+)
     jmp poll
 
 storereal:
     cla
     ldab 1(x)
     add a,_ib_state,b
-    dcr y,4
-    lda (y)
-    sta (b)
-    lda 2(y)
+    lda (-y)
     sta 2(b)
+    lda (-y)
+    sta (b)
     inr x,2
     jmp poll
 
@@ -124,6 +122,24 @@ integer_done:
     dcr y,4
     inx
     jmp poll
+
+ineg:
+    ivr -4(y),2         /* two's complement; -32768 stays unchanged on overflow */
+    jn rangeerr
+unary_done:
+    inx
+    jmp poll
+inot:
+    ivr -4(y)
+    bra unary_done
+iand:
+    ldb -8(y)
+    and -4(y),b
+    bra integer_done
+ior:
+    ldb -8(y)
+    ori -4(y),b
+    bra integer_done
 
 /* DIV returns the unsigned quotient in B and remainder in A. A signed
    quotient takes the XOR of the signs, a remainder the dividend's sign. */
@@ -177,8 +193,7 @@ element:
     ldx 2(s)
     rsr
 bad_element:
-    inr s,2
-    ldx (s)
+    ldx (s+)            /* discard the subroutine link and restore the bytecode IP */
     jmp rangeerr
 
 indexvar:
@@ -441,12 +456,11 @@ stackerr:
 divzeroerr:
     ldb -8
 finish:
-    stb (s)
     lda 10(s)
     stx (a)
     stw y,2(a)
     stw z,6(a)
-    ldb (s+)
+    inr s,2
     pop xh,zl
     rsr
 

@@ -136,6 +136,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    '5 DEFINT I,J,S',
    '10 I=7:J=2:R=2',
    '20 PRINT "DIV ";I/J;",";-I/J;",";I/-J;",";-I/-J',
+   '21 PRINT "MUL ";(-I)*J;",";I*(-J);",";(-I)*(-J)',
+   '22 PRINT "BITS ";NOT I;",";I AND J;",";I OR J',
    '30 X=I/J:PRINT "MIXED ";X;",";I/R;",";R/(J*2)',
    '31 PRINT "LITERALS ";I/10;",";ABS(I/10.5-0.666667)<.000001',
    '40 S=0:FOR I=1 TO 10:S=S+I/30:NEXT I:PRINT "SUM ";S',
@@ -143,15 +145,24 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   ]) await command(line);
   output=await command('.RUN');
   assert.match(output,/\nDIV 3,-3,-3,3 *\r?\n/,output);
+  assert.match(output,/\nMUL -14,-14,14 *\r?\n/,output);
+  assert.match(output,/\nBITS -8,2,7 *\r?\n/,output);
   assert.match(output,/\nMIXED 3,3\.5,0\.5 *\r?\n/,output);
   assert.match(output,/\nLITERALS 0,-1 *\r?\n/,output);
   assert.match(output,/\nSUM 0 *\r?\n/,output);
   assert.match(output,/\nLIMITS -32768,1,0,0 *\r?\n/,output);
   output=await command('PRINT I/0');assert.match(output,/Division by zero/,output);
   output=await command('PRINT I/-1');assert.match(output,/out of range/,output);
+  output=await command('PRINT -I');assert.match(output,/out of range/,output);
+  output=await command('PRINT I*(-1)');assert.match(output,/out of range/,output);
   output=await command('PRINT -7 MOD 3;",";7 MOD -3');assert.match(output,/\n-1 *,1 *\r?\n/,output);
   await command('.NEW');
   checks.push('signed integer division truncates, checks bounds and promotes mixed operands to real');
+  for(const line of ['5 DEFINT A,I','10 DIM A(1):I=5','20 PRINT A(I)','30 PRINT 99'])
+   await command(line);
+  output=await command('.RUN');
+  assert.match(output,/Bytecode error at 20: .*out of range/,output);
+  await command('.NEW');
   output=await command('.DIR "BDEMO"');assert.ok(output.includes('0 files'),'BDEMO already exists; refusing to replace it');
   for(const line of fs.readFileSync(process.env.BASIC_SAMPLE,'ascii').trim().split(/\r?\n/))await command(line);
   output=await command('.RUN');assert.ok(output.includes('SUM 55')&&output.includes('SQRT2 1.41421'),output);

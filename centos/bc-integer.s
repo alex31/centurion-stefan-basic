@@ -47,13 +47,13 @@ _ib_mul16:
 	bp mul_right
 	ldb 8(s)
 	sub a,b
-	xab
+	xfr b,a
 mul_right:
 	ldb 8(s)
 	bp mul_check
 	ldb (x)
 	sub a,b
-	xab
+	xfr b,a
 mul_check:
 	ldb (s+)
 	bp mul_high
