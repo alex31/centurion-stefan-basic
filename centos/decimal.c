@@ -89,6 +89,18 @@ unsigned bas_ftoa(char *out,float input)
  if(!v.u){out[used++]='0';goto done;}
  e=(int)(v.u>>23);m=v.u&0x7fffffUL;
  if(e){m|=0x800000UL;e-=150;}else e=-149;
+ /* Cancel powers of two before expanding the denominator into powers of
+    five. Zero was handled above, so the significand passed to ctz is nonzero. */
+ if(e<0){
+#if defined(__SDCC_cpu6) || defined(__GNUC__)
+  unsigned shift = __builtin_ctzl(m);
+  if(shift > (unsigned)-e) shift = (unsigned)-e;
+  m >>= shift;
+  e += (int)shift;
+#else
+  while(e<0 && !(m&1U)){m>>=1;e++;}
+#endif
+ }
  init(&a,m);
  if(e>=0)shift(&a,e);else{scale=e;while(e++<0)mul(&a,5,0);}
  do{digits[n++]=(char)('0'+divide(&a,10));}while(a.n>1||a.d[0]);
