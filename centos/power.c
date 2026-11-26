@@ -15,8 +15,10 @@ float sb_pow(float base,float exponent)
  integer=floorf(exponent);
  if(integer==exponent&&exponent>=-32767.0f&&exponent<=32767.0f){
   negative=exponent<0.0f;n=(uint16_t)(negative?-exponent:exponent);
+  /* A positive power may overflow even when its reciprocal is representable. */
+  if(negative)factor=1.0f/base;
   while(n){if(n&1U)result*=factor;n>>=1;if(n)factor*=factor;}
-  return negative?1.0f/result:result;
+  return result;
  }
  if(base==0.0f)return exponent>0.0f?0.0f:INFINITY;
  negative=base<0.0f;

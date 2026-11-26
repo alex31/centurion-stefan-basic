@@ -30,6 +30,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   assert.ok(output.includes('REAL 90000 -1 512'),output);
   output=await command('PRINT "SQUARE ";(-3)^2;",";0^2');
   assert.match(output,/\nSQUARE 9,0 *\r?\n/,output);
+  output=await command('PRINT "TINY ";2^(-149)=1.4E-45;",";POW(-2,-149)=-1.4E-45');
+  assert.match(output,/\nTINY -1,-1 *\r?\n/,output);
   output=await command('PRINT "TRIG ";ABS(COS(1)-0.5403023)<.00001;",";ABS(TAN(1)-1.5574077)<.00001');
   assert.match(output,/\nTRIG -1,-1 *\r?\n/,output);
   output=await command('K=RND(1):PRINT "RANDOM ";K>=0;",";K<=1;",";RND(0)');
