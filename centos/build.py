@@ -259,13 +259,13 @@ def main():
      cold[atom]=group;prototypes[atom]=(cname,*signature);real[atom]='_ovf%02d_%03d'%(group,len(real))
   # Private helpers and compiler string constants referenced exclusively by
   # one cold group can move with that group. Mutable data always stays fixed.
-  consumers={a:set() for a in live}
-  for u in units:
-   for a in u.atoms:
-    if a in live:
-     for ref in a.refs:
-      target=resolve(u,ref)
-      if target in consumers and target is not a:consumers[target].add(a)
+  # Helper labels and overlay offsets depend on discovery order. Traverse
+  # live atoms in their original object and assembly order on every pass.
+  consumers={a:set() for u in units for a in u.atoms if a in live}
+  for a in consumers:
+   for ref in a.refs:
+    target=resolve(a.unit,ref)
+    if target in consumers and target is not a:consumers[target].add(a)
   def float_library(a):return a.unit.name.startswith(str(libs/'cpu6/libfloat32-sdcc.a')+'(')
   def float_constant(a):
    if not float_library(a) or a.kind!='data' or a.segment!='data':return False
@@ -280,7 +280,7 @@ def main():
   changed=True
   while changed:
    changed=False
-   for a in live:
+   for a in consumers:
     if a in cold or a.unit.opaque:continue
     private=a.kind=='function' and a in entries and (not (a.defined & a.unit.exports) or (float_library(a) and entries[a].startswith('__r_')))
     string=a.kind=='data' and a.segment=='data' and all(n.startswith('___str_') for n in a.defined)
