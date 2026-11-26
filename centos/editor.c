@@ -1,7 +1,7 @@
 #include "app.h"
 #include "work.h"
 #ifdef __CPU6_OS6__
-int bas_rawkey(void);
+#include <os6_curses.h>
 #endif
 /* The editor keeps only the selected line as text. Edits track the origin
    of each character so committing can preserve untouched numeric tokens. */
@@ -79,10 +79,24 @@ static void edit_insert(char c)
 static void edit_column(unsigned column)
 {
  column+=2; /* VT100 columns are one-based, with one margin column. */
+#ifdef __CPU6_OS6__
+ bas_flush();
+ os6_curses_column(column);
+#else
  outsc("\033[");
  if(column>=10)outch((char)('0'+column/10));
  outch((char)('0'+column%10));
  outch('G');
+#endif
+}
+static void edit_keypad(int enabled)
+{
+#ifdef __CPU6_OS6__
+ bas_flush();
+ os6_curses_keypad(enabled);
+#else
+ outsc(enabled?"\033[?1h":"\033[?1l");
+#endif
 }
 static void edit_repaint(unsigned first,unsigned start)
 {
@@ -90,7 +104,12 @@ static void edit_repaint(unsigned first,unsigned start)
  if(end>first+EDIT_COLUMNS)end=first+EDIT_COLUMNS;
  edit_column(start-first);
  outs(edit_text+start,end-start);
+#ifdef __CPU6_OS6__
+ bas_flush();
+ os6_curses_eol();
+#else
  outsc("\033K");
+#endif
  edit_column(edit_pos-first);
 }
 static void edit_arrow_echo(unsigned first,unsigned start)
@@ -102,20 +121,25 @@ static void edit_arrow_echo(unsigned first,unsigned start)
   outch(i<edit_len&&i<first+EDIT_COLUMNS?edit_text[i]:' ');
  edit_column(edit_pos-first);
 }
+#ifndef __CPU6_OS6__
 static unsigned edit_character(void)
 {
-#ifdef __CPU6_OS6__
- unsigned key=(unsigned)bas_rawkey();
- /* Native function key 4 is Up, while a literal Ctrl-D arrives with bit 7. */
- return key==4?0:key&127;
-#else
  unsigned char c=(unsigned char)inch();
  if(stb_done)return 4;
  return c=='\n'?13:c;
-#endif
 }
+#endif
 static unsigned edit_key(unsigned *escaped)
 {
+#ifdef __CPU6_OS6__
+ int key=os6_curses_getch();
+ if(key<0)return 4;
+ if(key<256)return key;
+ *escaped=1;
+ if(key==OS6_KEY_RIGHT)return 6;
+ if(key==OS6_KEY_LEFT)return 21;
+ return 0;
+#else
  unsigned key=edit_character();
  if(key!=27&&key!=5)return key;
  key=edit_character();
@@ -125,20 +149,21 @@ static unsigned edit_key(unsigned *escaped)
  if(key=='C')return 6;
  if(key=='D')return 21;
  return key==4?4:0;
+#endif
 }
 /* Keep the listing overlay active throughout the keystroke loop. The lexer
    is needed only once, after Enter commits the draft. */
 static unsigned edit_input(void)
 {
  unsigned first=edit_pos>EDIT_COLUMNS?edit_pos-EDIT_COLUMNS/2:0;
- outsc("\033[?1h");
+ edit_keypad(1);
  edit_repaint(first,first);
  for(;;){
   unsigned key,old_pos=edit_pos,escaped=0,changed=0;
   bas_flush();
   key=edit_key(&escaped);
   if(key==4||key==13){
-   outsc("\033[?1l");
+   edit_keypad(0);
    outcr();
    return key==13;
   }

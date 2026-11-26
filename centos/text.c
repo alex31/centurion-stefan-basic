@@ -170,7 +170,8 @@ void bas_list(void)
   } while(target==first);
   first=target;
  }
- outsc("\033[24;1H\033[KUnable to list program\n");
+ page_prompt();
+ outsc("Unable to list program\n");
 done:
  page_end();
 }

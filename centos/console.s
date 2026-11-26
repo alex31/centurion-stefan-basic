@@ -1,7 +1,6 @@
  .setcpu 6
  .code
  .export _bas_readline
- .export _bas_rawkey
  .export _bas_ov_abort
 ; A failed caller-code restoration must never return into the wrong overlay.
 _bas_ov_abort:
@@ -24,17 +23,6 @@ _bas_readline:
  ldb (b)
  ldx (s+)
  rsr
-; Read one CRT byte without waiting for a line. CENTOS echoes and translates keys.
-_bas_rawkey:
- stx (-s)
- ldb key_op
- .byte 0x66,0x00
- .byte 0x66,0x08
- .word key_op
- ldbb (key_byte+2)
- clrb bh
- ldx (s+)
- rsr
  .data
 line_op:
  .byte 0,0x81,0,1
@@ -42,9 +30,3 @@ line_limit:
  .word 0
 line_buffer:
  .word 0,0
-key_op:
- .byte 0,0x81,0x08,1
- .word 1,key_byte,0
- .bss
-key_byte:
- .ds 4

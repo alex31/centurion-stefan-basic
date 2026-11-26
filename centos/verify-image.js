@@ -100,7 +100,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    await s.waitFor(marker,from,20000);
    return s.output.slice(from);
   }
-  const listStart=(text,line)=>assert.ok(text.includes('\x1b[H\x1b[J'+line+' REM'),text);
+  const listStart=(text,line)=>assert.ok(text.includes('\x1b[2J\x1b[H'+line+' REM'),text);
   for(let line=10;line<=260;line+=10){
    await command(line+' REM '+(line===20?'X'.repeat(92)+'TAIL':'LINE'));
   }
@@ -272,9 +272,12 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   checks.push('the same BASIC command reenters the REPL with the loaded module and returns to CENTOS');
   if(process.env.BASIC_GAMES==='1'){
    const prefix=process.env.BASIC_GAME_PREFIX||'';
-   await command('.RUN '+prefix+'XCONNECT4','Column (1-7), or Q to quit: ');
+   const terminal='Enter for VT100): ';
+   const connect=await command('.RUN '+prefix+'XCONNECT4',/Enter for VT100\): |Column \(1-7\), or Q to quit: /);
+   if(connect.includes(terminal))await command('','Column (1-7), or Q to quit: ');
    await command('Q','End of Connect Four.');await command('.STA','STATUS DISPLAY');
-   await command('.RUN '+prefix+'XCHESS','(W/B/2/Q): ');
+   const chess=await command('.RUN '+prefix+'XCHESS',/Enter for VT100\): |\(W\/B\/2\/Q\): /);
+   if(chess.includes(terminal))await command('','(W/B/2/Q): ');
    await command('Q','End of Chess.');await command('.STA','STATUS DISPLAY');
    checks.push('both games run while the BASIC module remains loaded');
   }
